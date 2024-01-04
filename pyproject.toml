@@ -15,7 +15,7 @@ keywords = []
 
 # pip dependencies of the project
 # Installed locally with `pip install -e .`
-dependencies = ["jax"]
+dependencies = ["jax", "flax", "numpy", "etils[epath]"]
 
 # `version` is automatically set by flit to use `jaxcam.__version__`
 dynamic = ["version"]
@@ -34,6 +34,7 @@ dev = [
     "pytest-xdist",
     "pylint>=2.6.0",
     "pyink",
+    "absl-py",
 ]
 
 [tool.pyink]
