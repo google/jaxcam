@@ -1,4 +1,4 @@
-# Copyright 2023 The jaxcam Authors.
+# Copyright 2024 The jaxcam Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1009,7 +1009,7 @@ def concatenate(cameras: Sequence[Camera], axis: int = 0) -> Camera:
         f': got {dimensions}')
 
   # Expand unbatched cameras.
-  cameras = [(c if c.shape else jax.tree_map(
+  cameras = [(c if c.shape else jax.tree.map(
       functools.partial(jnp.expand_dims, axis=0), c)) for c in cameras]
 
   cls = cameras[0].__class__
