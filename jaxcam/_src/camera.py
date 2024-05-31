@@ -574,7 +574,7 @@ def local_points_to_world_points(
 
   rotated_points = math.matmul(camera.orientation.T, local_points_flat.T).T
   world_points = rotated_points + camera.position
-  return world_points.reshape(world_points.shape)
+  return world_points.reshape(local_points.shape)
 
 
 def depth_to_ray_depth(camera: Camera, ray: jnp.ndarray,
