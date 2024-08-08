@@ -23,9 +23,16 @@ To release a new version (e.g. from `1.0.0` -> `2.0.0`):
 
 ## [Unreleased]
 
-## [0.1.0] - 2022-01-01
+## [0.2.0] - 2024-08-08
+
+* Added utilities to convert Cameras to rays and rays to Cameras.
+
+[Unreleased]: https://github.com/google/jaxcam/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/google/jaxcam/releases/tag/v0.2.0
+
+## [0.1.1] - 2022-01-01
 
 * Initial release
 
-[Unreleased]: https://github.com/google/jaxcam/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/google/jaxcam/releases/tag/v0.1.0
+[Unreleased]: https://github.com/google/jaxcam/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/google/jaxcam/releases/tag/v0.1.1
