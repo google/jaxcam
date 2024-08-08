@@ -47,3 +47,7 @@ from jaxcam._src.camera import (
     world_points_to_local_points as world_points_to_local_points,
     world_to_camera_matrix as world_to_camera_matrix,
 )
+from jaxcam._src.rays import (
+    get_camera_from_rays as get_camera_from_rays,
+    get_rays_from_camera as get_rays_from_camera,
+)

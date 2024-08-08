@@ -57,27 +57,27 @@ class Camera:
     https://web.archive.org/web/20180312205006/https://www.asprs.org/wp-content/uploads/pers/1966journal/may/1966_may_444-462.pdf
 
   Attributes:
-    orientation: [..., 3, 3] array of world-to-camera rotations.
-    position: [..., 3] array of world-space positions.
-    focal_length: [...] array or float of focal length in x.
-    principal_point: [..., 2] array of the image-space principal point.
-    image_size: [..., 2] array of image sizes.
-    skew: [...] array or float of skew coefficients.
-    pixel_aspect_ratio: [...] array or float of pixel aspect ratios (height /
+    orientation: (..., 3, 3) array of world-to-camera rotations.
+    position: (..., 3) array of world-space positions.
+    focal_length: (...) array or float of focal length in x.
+    principal_point: (..., 2) array of the image-space principal point.
+    image_size: (..., 2) array of image sizes.
+    skew: (...) array or float of skew coefficients.
+    pixel_aspect_ratio: (...) array or float of pixel aspect ratios (height /
       width)
-    radial_distortion: [..., 4] array of radial distortion coefficients.
-    tangential_distortion: [..., 2] array of tangential distortion coefficients.
+    radial_distortion: (..., 4) array of radial distortion coefficients.
+    tangential_distortion: (..., 2) array of tangential distortion coefficients.
     scale_factor_x: convenience property for focal_length.
     scale_factor_y: convenience property for focal_length * pixel_aspect_ratio.
-    principal_point_x: convenience property for principal_point[..., 0].
-    principal_point_y: convenience property for principal_point[..., 1].
-    image_size_x: convenience property for image_size[..., 0].
-    image_size_y: convenience property for image_size[..., 1].
-    optical_axis: convenience property for orientation[..., 2, :].
+    principal_point_x: convenience property for principal_point(..., 0).
+    principal_point_y: convenience property for principal_point(..., 1).
+    image_size_x: convenience property for image_size(..., 0).
+    image_size_y: convenience property for image_size(..., 1).
+    optical_axis: convenience property for orientation(..., 2, :).
     translation: the camera translation vector.
-    world_to_camera_matrix: [..., 4, 4] the world-to-camera matrix of the camera
+    world_to_camera_matrix: (..., 4, 4) the world-to-camera matrix of the camera
       (also known as the extrinsic matrix).
-    intrinsic_matrix: [..., 3, 3] the intrinsic matrix of the camera.
+    intrinsic_matrix: (..., 3, 3) the intrinsic matrix of the camera.
     projection_type: the projection type of the camera.
     has_distortion: will be True if either radial or tangential distortion is
       enabled.
@@ -502,7 +502,7 @@ def pixels_to_rays(
 
   Args:
     camera: Camera instance.
-    pixels: [..., 2] array containing 2d pixel positions.
+    pixels: (..., 2) array containing 2d pixel positions.
     normalize: If True, normalize the output ray directions. If False, the
       returned directions will be points at the image plane at distance 1 from
       camera center. Defaults to True.
