@@ -50,4 +50,5 @@ from jaxcam._src.camera import (
 from jaxcam._src.rays import (
     get_camera_from_rays as get_camera_from_rays,
     get_rays_from_camera as get_rays_from_camera,
+    Rays as Rays,
 )

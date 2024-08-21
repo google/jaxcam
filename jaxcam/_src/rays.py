@@ -15,15 +15,133 @@
 """Utilities for converting cameras to and from ray-based representations."""
 
 from typing import Any, Optional
+from flax import struct
 import jax
 import jax.numpy as jnp
 from jaxcam._src import camera as jaxcam
 from jaxcam._src import math
 
 
+@struct.dataclass
+class Rays:
+  """Represents cameras as a bundle of rays.
+
+  Supports rays represented as directions and origins or directions and moments
+  (Plücker coordinates [1]). Whereas a line can be represented by any origin
+  along the ray, it is represented by a unique (normalized) direction and
+  moment.
+
+  This class should not be instantiated directly. Use the `create()` function
+  instead.
+
+  [1]: https://en.wikipedia.org/wiki/Pl%C3%BCcker_coordinates
+
+  Attributes:
+    directions: (..., 3) Ray directions.
+    origins: (..., 3) Ray origins.
+    moments: (..., 3) Plücker moments.
+    shape: (int, ...) The shape of the rays.
+  """
+
+  directions: jnp.ndarray
+  origins: jnp.ndarray
+
+  @classmethod
+  def create(
+      cls,
+      directions: jnp.ndarray,
+      *,
+      origins: Optional[jnp.ndarray] = None,
+      moments: Optional[jnp.ndarray] = None,
+  ) -> 'Rays':
+    """Creates a Rays object.
+
+    Note that if the rays are instantiated with moments, the origins could be
+    any point along the ray. In other words,
+    `Rays.create(rays.directions, moments=rays.moments).origins` is not
+    guaranteed to be the same as `rays.origins`.
+
+    Args:
+      directions: (..., 3) Unit normalized ray directions.
+      origins: (..., 3) Ray origins.
+      moments: (..., 3) Plücker moments.
+
+    Returns:
+      A Rays object.
+    """
+    # Ensure directions are unit normalized.
+    norms = jnp.linalg.norm(directions, axis=-1, keepdims=True)
+    directions = directions / norms
+    if origins is not None and moments is not None:
+      raise ValueError('Cannot specify both origins and moments.')
+    if origins is None and moments is None:
+      raise ValueError('Must specify either origins or moments.')
+
+    if moments is not None:
+      if directions.shape != moments.shape:
+        raise ValueError(
+            'Directions and moments must have the same shape. Got '
+            f'{directions.shape} and {moments.shape}'
+        )
+      origins = jnp.cross(directions, moments, axis=-1)
+    elif origins is not None:
+      if directions.shape != origins.shape:
+        raise ValueError(
+            'Directions and origins must have the same shape. Got '
+            f'{directions.shape} and {origins.shape}'
+        )
+    return cls(directions=directions, origins=origins)
+
+  @property
+  def moments(self) -> jnp.ndarray:
+    norm = jnp.linalg.norm(self.directions, axis=-1, keepdims=True)
+    return jnp.cross(self.origins, self.directions / norm, axis=-1)
+
+  def to_raymap_6d(self, use_plucker: bool = False) -> jnp.ndarray:
+    """Returns a 6D raymap representation of the rays.
+
+    Raymap represents rays as [moments, directions] (Plücker coordinates) or
+    [origins, directions]
+
+    Args:
+      use_plucker: If True, uses Plücker coordinates.
+
+    Returns:
+      A (..., 6) raymap representation of the rays.
+    """
+    if use_plucker:
+      return jnp.concatenate((self.moments, self.directions), axis=-1)
+    else:
+      return jnp.concatenate((self.origins, self.directions), axis=-1)
+
+  @classmethod
+  def from_raymap(
+      cls,
+      raymap: jnp.ndarray,
+      use_plucker: bool = False,
+  ) -> 'Rays':
+    """Creates a Rays object from a raymap representation."""
+    moments_or_origins = raymap[..., :3]
+    directions = raymap[..., 3:]
+    if use_plucker:
+      moments, origins = moments_or_origins, None
+    else:
+      moments, origins = None, moments_or_origins
+    return cls.create(
+        directions=directions,
+        moments=moments,
+        origins=origins,
+    )
+
+  @property
+  def shape(self) -> tuple[int, ...]:
+    return self.directions.shape
+
+
 def get_rays_from_camera(
-    camera: jaxcam.Camera, normalize: bool = True
-) -> tuple[jnp.ndarray, jnp.ndarray]:
+    camera: jaxcam.Camera,
+    normalize: bool = True,
+) -> Rays:
   """Computes rays unprojected from every pixel.
 
   Currently only supports a single camera.
@@ -40,12 +158,11 @@ def get_rays_from_camera(
   origins = jnp.tile(
       camera.position, (int(camera.image_size[1]), int(camera.image_size[0]), 1)
   )
-  return directions, origins
+  return Rays.create(directions=directions, origins=origins)
 
 
 def get_camera_from_rays(
-    directions: jnp.ndarray,
-    origins: jnp.ndarray,
+    rays: Rays,
     use_ransac: bool = False,
     ransac_parameters: Optional[dict[str, Any]] = None,
 ) -> jaxcam.Camera:
@@ -60,8 +177,7 @@ def get_camera_from_rays(
   https://github.com/DeepRobot2020/books/blob/master/Multiple%20View%20Geometry%20in%20Computer%20Vision%20(Second%20Edition).pdf
 
   Args:
-    directions: (H, W, 3) Unit normalized ray directions.
-    origins: (H, W, 3) Ray origins.
+    rays: Camera rays where directions and origins are (H, W, 3).
     use_ransac: If True, uses RANSAC to robustly estimate the camera parameters.
     ransac_parameters: Parameters for RANSAC. See
       _compute_homography_transform_ransac for valid keys.
@@ -69,8 +185,8 @@ def get_camera_from_rays(
   Returns:
     camera: jaxcam.Camera.
   """
-  position = jnp.mean(origins, axis=(0, 1))
-  height, width, _ = directions.shape
+  position = jnp.mean(rays.origins, axis=(0, 1))
+  height, width, _ = rays.directions.shape
   identity_camera = jaxcam.Camera.create(
       orientation=jnp.eye(3),
       image_size=jnp.array([width, height]),
@@ -78,10 +194,10 @@ def get_camera_from_rays(
       focal_length=jnp.array([1.0]),
       principal_point=jnp.array([0, 0]),
   )
-  identity_directions, _ = get_rays_from_camera(identity_camera)
+  identity_rays = get_rays_from_camera(identity_camera)
   intrinsics, orientation, _ = ray_dlt(
-      identity_directions.reshape(-1, 3),
-      directions.reshape(-1, 3),
+      identity_rays.directions.reshape(-1, 3),
+      rays.directions.reshape(-1, 3),
       use_ransac=use_ransac,
       ransac_parameters=ransac_parameters,
   )

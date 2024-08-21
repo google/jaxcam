@@ -23,6 +23,8 @@ To release a new version (e.g. from `1.0.0` -> `2.0.0`):
 
 ## [Unreleased]
 
+* Added Rays dataclass with Plucker ray support
+
 ## [0.2.0] - 2024-08-08
 
 * Added utilities to convert Cameras to rays and rays to Cameras.

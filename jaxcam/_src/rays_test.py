@@ -53,8 +53,8 @@ class RaysTest(parameterized.TestCase):
   def test_camera_to_ray_to_camera(self, seed):
     rng = jax.random.PRNGKey(seed)
     camera = random_camera(rng)
-    directions, origins = jax_rays.get_rays_from_camera(camera)
-    camera_recovered = jax_rays.get_camera_from_rays(directions, origins)
+    rays = jax_rays.get_rays_from_camera(camera)
+    camera_recovered = jax_rays.get_camera_from_rays(rays)
     np.testing.assert_allclose(
         camera_recovered.principal_point_x,
         camera.principal_point_x,
@@ -88,14 +88,19 @@ class RaysTest(parameterized.TestCase):
 
     camera = random_camera(rng)
     rng_direction, rng_origin = jax.random.split(rng, 2)
-    directions, origins = jax_rays.get_rays_from_camera(camera)
+    rays = jax_rays.get_rays_from_camera(camera)
     noise_direction = (
-        jax.random.normal(rng_direction, shape=directions.shape) * sigma
+        jax.random.normal(rng_direction, shape=rays.directions.shape) * sigma
     )
-    noise_origin = jax.random.normal(rng_origin, shape=origins.shape) * sigma
+    noise_origin = (
+        jax.random.normal(rng_origin, shape=rays.origins.shape) * sigma
+    )
+    noisy_rays = jax_rays.Rays.create(
+        directions=rays.directions + noise_direction,
+        origins=rays.origins + noise_origin,
+    )
     camera_recovered = jax_rays.get_camera_from_rays(
-        directions + noise_direction,
-        origins + noise_origin,
+        noisy_rays,
         use_ransac=True,
         ransac_parameters=ransac_paramters,
     )
@@ -119,6 +124,37 @@ class RaysTest(parameterized.TestCase):
     )
     np.testing.assert_allclose(
         camera_recovered.position, camera.position, rtol=1e-3, atol=1e-3
+    )
+
+  @parameterized.parameters(range(10))
+  def test_plucker_coordinates(self, seed):
+    rng = jax.random.PRNGKey(seed)
+    rng_camera, rng_magnitude = jax.random.split(rng, 2)
+    camera = random_camera(rng_camera)
+    rays = jax_rays.get_rays_from_camera(camera)
+    np.testing.assert_allclose(
+        rays.moments,
+        jnp.cross(rays.origins, rays.directions, axis=-1),
+        atol=1e-6,
+    )
+    magnitude = jax.random.uniform(
+        rng_magnitude, shape=rays.shape[:-1] + (1,), minval=0.5, maxval=2.0
+    )
+    new_rays = jax_rays.Rays.create(
+        directions=rays.directions * magnitude,
+        moments=rays.moments,
+    )
+    # Check that the origins of new rays are on the old rays. The origins of the
+    # ray computed using the moments will be the point closest to the world
+    # origin, which is not necessarily the same as the original origin.
+    t = jnp.sum(
+        (new_rays.origins - rays.origins) * rays.directions,
+        axis=-1,
+        keepdims=True,
+    )
+    closest_point_on_rays = rays.origins + t * rays.directions
+    np.testing.assert_allclose(
+        closest_point_on_rays, new_rays.origins, atol=1e-6
     )
 
 
