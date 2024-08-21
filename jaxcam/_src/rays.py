@@ -115,7 +115,7 @@ class Rays:
       return jnp.concatenate((self.origins, self.directions), axis=-1)
 
   @classmethod
-  def from_raymap(
+  def from_raymap_6d(
       cls,
       raymap: jnp.ndarray,
       use_plucker: bool = False,
