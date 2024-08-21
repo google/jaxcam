@@ -23,6 +23,14 @@ To release a new version (e.g. from `1.0.0` -> `2.0.0`):
 
 ## [Unreleased]
 
+## [0.3.0] - 2024-08-20
+
+* Added Rays dataclass with Plucker ray support.
+* Added utilities for transforming cameras.
+
+[Unreleased]: https://github.com/google/jaxcam/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/google/jaxcam/releases/tag/v0.3.0
+
 ## [0.2.0] - 2024-08-08
 
 * Added utilities to convert Cameras to rays and rays to Cameras.
