@@ -39,6 +39,7 @@ from jaxcam._src.camera import (
     project as project,
     ray_depth_to_depth as ray_depth_to_depth,
     relative_transform as relative_transform,
+    scale_to_image_size as scale_to_image_size,
     scale as scale,
     transform as transform,
     update_intrinsic_matrix as update_intrinsic_matrix,
@@ -48,7 +49,8 @@ from jaxcam._src.camera import (
     world_to_camera_matrix as world_to_camera_matrix,
 )
 from jaxcam._src.rays import (
+    Rays as Rays,
     get_camera_from_rays as get_camera_from_rays,
     get_rays_from_camera as get_rays_from_camera,
-    Rays as Rays,
+    ray_dlt as ray_dlt,
 )
