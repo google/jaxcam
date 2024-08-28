@@ -282,7 +282,6 @@ class CameraTest(parameterized.TestCase):
     )
     assert camera.translation.shape == (*batch_shape, 3)
 
-  @absltest.skip("TODO: Implement improved batching behavior.")
   @parameterized.product(batch_shapes=_SHAPES_THAT_BROADCAST)
   def test_batched_world_points_to_local_points(self, batch_shapes):
     batch_shape_a, batch_shape_b, *_ = batch_shapes
@@ -295,7 +294,6 @@ class CameraTest(parameterized.TestCase):
         == (*jnp.broadcast_shapes(batch_shape_a, batch_shape_b), 3)
     )
 
-  @absltest.skip("TODO: Implement improved batching behavior.")
   @parameterized.product(batch_shapes=_SHAPES_THAT_BROADCAST)
   def test_batched_local_points_to_world_points(self, batch_shapes):
     batch_shape_a, batch_shape_b, *_ = batch_shapes
@@ -308,7 +306,6 @@ class CameraTest(parameterized.TestCase):
         == (*jnp.broadcast_shapes(batch_shape_a, batch_shape_b), 3)
     )
 
-  @absltest.skip("TODO: Implement improved batching behavior.")
   @parameterized.product(batch_shapes=_SHAPES_THAT_BROADCAST)
   def test_batched_depth_to_ray_depth(self, batch_shapes):
     batch_shape_a, batch_shape_b, batch_shape_c = batch_shapes
@@ -322,7 +319,6 @@ class CameraTest(parameterized.TestCase):
         jnp.broadcast_shapes(*batch_shapes)
     )
 
-  @absltest.skip("TODO: Implement improved batching behavior.")
   @parameterized.product(batch_shapes=_SHAPES_THAT_BROADCAST)
   def test_batched_ray_depth_to_depth(self, batch_shapes):
     batch_shape_a, batch_shape_b, batch_shape_c = batch_shapes
@@ -336,7 +332,6 @@ class CameraTest(parameterized.TestCase):
         jnp.broadcast_shapes(*batch_shapes)
     )
 
-  @absltest.skip("TODO: Implement improved batching behavior.")
   @parameterized.product(
       normalize_rays=[True, False],
       batch_shape=_SHAPES_THAT_BROADCAST,
@@ -352,7 +347,6 @@ class CameraTest(parameterized.TestCase):
         == (*jnp.broadcast_shapes(batch_shape_a, batch_shape_b), 3)
     )
 
-  @absltest.skip("TODO: Implement improved batching behavior.")
   @parameterized.product(batch_shapes=_SHAPES_THAT_BROADCAST)
   def test_batched_camera_to_world_matrix(self, batch_shapes):
     batch_shape, *_ = batch_shapes

@@ -365,7 +365,7 @@ class Camera:
   @property
   def translation(self) -> jnp.ndarray:
     # pylint: disable=invalid-unary-operand-type
-    return math.matmul(-self.orientation, self.position[..., None]).squeeze(-1)
+    return math.matvecmul(-self.orientation, self.position)
 
   @property
   def world_to_camera_matrix(self) -> jnp.ndarray:
@@ -379,7 +379,7 @@ class Camera:
   def camera_to_world_matrix(self) -> jnp.ndarray:
     """Returns the 4x4 matrix that takes camera points to world coordinates."""
     matrix = jnp.empty((*self.shape, 3, 4))
-    matrix = matrix.at[..., :3, :3].set(self.orientation.transpose(-1, -2))
+    matrix = matrix.at[..., :3, :3].set(jnp.matrix_transpose(self.orientation))
     matrix = matrix.at[..., :3, 3].set(self.position)
     return _to_matrix_4x4(matrix)
 
@@ -496,7 +496,9 @@ def pixels_to_local_rays(
 
 
 def pixels_to_rays(
-    camera: Camera, pixels: jnp.ndarray, normalize: bool = True
+    camera: Camera,
+    pixels: jnp.ndarray,
+    normalize: bool = True,
 ) -> jnp.ndarray:
   """Returns world-space rays for the provided pixels.
 
@@ -513,16 +515,11 @@ def pixels_to_rays(
   if pixels.shape[-1] != 2:
     raise ValueError('The last dimension of pixels must be 2.')
 
-  batch_shape = pixels.shape[:-1]
-  pixels = jnp.reshape(pixels, (-1, 2))
-
   local_rays_dir = pixels_to_local_rays(camera, pixels, normalize=normalize)
-  rays_dir = math.matmul(
-      jnp.swapaxes(camera.orientation, -1, -2), local_rays_dir[..., jnp.newaxis]
+  return math.matvecmul(
+      jnp.matrix_transpose(camera.orientation),
+      local_rays_dir,
   )
-  rays_dir = jnp.squeeze(rays_dir, axis=-1)
-  rays_dir = rays_dir.reshape((*batch_shape, 3))
-  return rays_dir
 
 
 def pixels_to_points(
@@ -537,8 +534,10 @@ def pixels_to_points(
   return points
 
 
-def world_points_to_local_points(camera: Camera,
-                                 world_points: jnp.ndarray) -> jnp.ndarray:
+def world_points_to_local_points(
+    camera: Camera,
+    world_points: jnp.ndarray,
+) -> jnp.ndarray:
   """Transforms world-space (x,y,z) points to local-space (x,y,z) points.
 
   Local-space coordinates are also known as camera-space coordinates.
@@ -550,14 +549,13 @@ def world_points_to_local_points(camera: Camera,
   Returns:
     The local-space coordinates.
   """
-  world_points_flat = world_points.reshape((-1, 3))
-  translated_points = world_points_flat - camera.position
-  local_points = (math.matmul(camera.orientation, translated_points.T)).T
-  return local_points.reshape(world_points.shape)
+  translated_points = world_points - camera.position
+  return math.matvecmul(camera.orientation, translated_points)
 
 
 def local_points_to_world_points(
-    camera: Camera, local_points: jnp.ndarray
+    camera: Camera,
+    local_points: jnp.ndarray,
 ) -> jnp.ndarray:
   """Transforms local-space (x,y,z) points to world-space (x,y,z) points.
 
@@ -570,15 +568,18 @@ def local_points_to_world_points(
   Returns:
     The world-space coordinates.
   """
-  local_points_flat = local_points.reshape((-1, 3))
+  rotated_points = math.matvecmul(
+      jnp.matrix_transpose(camera.orientation),
+      local_points,
+  )
+  return rotated_points + camera.position
 
-  rotated_points = math.matmul(camera.orientation.T, local_points_flat.T).T
-  world_points = rotated_points + camera.position
-  return world_points.reshape(local_points.shape)
 
-
-def depth_to_ray_depth(camera: Camera, ray: jnp.ndarray,
-                       depth: jnp.ndarray) -> jnp.ndarray:
+def depth_to_ray_depth(
+    camera: Camera,
+    ray: jnp.ndarray,
+    depth: jnp.ndarray,
+) -> jnp.ndarray:
   """Converts depth along the optical axis to depth along ray.
 
   Args:
@@ -589,12 +590,15 @@ def depth_to_ray_depth(camera: Camera, ray: jnp.ndarray,
   Returns:
     (..., 3) The depth along the optical axis for each ray.
   """
-  cosa = math.matmul(ray, camera.optical_axis)
+  cosa = math.dot(ray, camera.optical_axis)
   return depth / cosa
 
 
-def ray_depth_to_depth(camera: Camera, ray: jnp.ndarray,
-                       ray_depth: jnp.ndarray) -> jnp.ndarray:
+def ray_depth_to_depth(
+    camera: Camera,
+    ray: jnp.ndarray,
+    ray_depth: jnp.ndarray,
+) -> jnp.ndarray:
   """Converts depth along ray to depth along the optical axis.
 
   Args:
@@ -605,7 +609,7 @@ def ray_depth_to_depth(camera: Camera, ray: jnp.ndarray,
   Returns:
     (..., 3) The depth along the optical axis for each ray.
   """
-  cosa = math.matmul(ray, camera.optical_axis)
+  cosa = math.dot(ray, camera.optical_axis)
   return ray_depth * cosa
 
 
@@ -902,6 +906,9 @@ def look_at(
   # Make a 4x4 translation matrix:
   view_translation = jnp.eye(4).at[:3, 3].set(-eye)
 
+  # TODO(charatan): This is an incorrect use of math.matmul (since it's a
+  # matrix-vector product), but the rest of the function isn't written to
+  # handle batching anyway.
   cam_from_world = math.matmul(view_rotation, view_translation)
 
   if camera_convention == 'opencv':
@@ -1062,12 +1069,14 @@ def transform(
   Returns:
     The transformed camera.
   """
-  new_orientation = math.matmul(camera.orientation, rotation.T)
+  new_orientation = math.matmul(
+      camera.orientation,
+      jnp.matrix_transpose(rotation),
+  )
   new_position = math.transform_point(
       camera.position, scale=scale, rotation=rotation, translation=translation
   )
-  camera = camera.replace(orientation=new_orientation, position=new_position)
-  return camera
+  return camera.replace(orientation=new_orientation, position=new_position)
 
 
 def relative_transform(reference: Camera, target: Camera) -> jnp.ndarray:
@@ -1129,6 +1138,6 @@ def fundamental_matrix(reference: Camera, target: Camera) -> jnp.ndarray:
     line in the target camera.
   """
   essential_mat = essential_matrix(reference, target)
-  left = jnp.linalg.inv(target.intrinsic_matrix).T
+  left = jnp.matrix_transpose(jnp.linalg.inv(target.intrinsic_matrix))
   right = jnp.linalg.inv(reference.intrinsic_matrix)
   return math.matmul(left, math.matmul(essential_mat, right))
