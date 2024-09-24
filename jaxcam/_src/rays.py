@@ -135,28 +135,61 @@ class Rays:
 
   @property
   def shape(self) -> tuple[int, ...]:
-    return self.directions.shape
+    # Take batch dimensions of directions. Rays are always 6-D.
+    return self.directions.shape[:-1] + (6,)
 
 
 def get_rays_from_camera(
     camera: jaxcam.Camera,
     normalize: bool = True,
+    image_size: Optional[tuple[int, int]] = None,
+    disable_image_size_check: bool = False,
 ) -> Rays:
   """Computes rays unprojected from every pixel.
 
-  Currently only supports a single camera.
-
   Args:
     camera: Camera to unproject.
-    normalize (bool): If True, normalizes the directions to have unit norm.
+    normalize: If True, normalizes the directions to have unit norm.
+    image_size: The (W, H) image size to use. If None, uses the image size of
+      the camera. If the camera is batched, image_size must be specified (unless
+      disable_image_size_check is True) and must be consistent for all cameras.
+    disable_image_size_check: If True, disables the image size check. This is
+    necessary for jitted functions, but use with caution.
 
   Returns:
-    A tuple of (directions, origins) where both are (H, W, 3).
+    Rays of shape (*camera.shape, H, W, 6).
   """
-  pixels = jaxcam.get_pixel_centers(*camera.image_size)
-  directions = jaxcam.pixels_to_rays(camera, pixels, normalize=normalize)
-  origins = jnp.tile(
-      camera.position, (int(camera.image_size[1]), int(camera.image_size[0]), 1)
+  if image_size is None:
+    image_size = camera.image_size.astype(int)
+  if not disable_image_size_check and jnp.any(
+      camera.image_size != jnp.array([image_size[0], image_size[1]])
+  ):
+    raise ValueError(
+        'Camera image size must match image_size. Got '
+        f'{camera.image_size} and {image_size}'
+    )
+  num_pixels = image_size[0] * image_size[1]
+  pixels = jaxcam.get_pixel_centers(image_size[0], image_size[1])
+  # We have to put num_pixels in the first dimension to ensure that the shapes
+  # can be broadcasted properly.
+  pixels_flattened = jnp.reshape(  # (H * W, ..., 2)
+      pixels,
+      (num_pixels,) + (1,) * camera.ndim + (2,),
+  )
+  directions = jaxcam.pixels_to_rays(
+      camera, pixels_flattened, normalize=normalize
+  )
+  # axes: (1, 2, ..., N-2, 0, N-1)
+  axes = list(range(directions.ndim))[1:]
+  axes.insert(-1, 0)
+  directions = jnp.transpose(directions, axes)  # (..., H * W, 3)
+  # (..., H, W, 3)
+  directions = jnp.reshape(
+      directions, camera.shape + (image_size[1], image_size[0], 3)
+  )
+  origins = jnp.broadcast_to(
+      jnp.expand_dims(camera.position, axis=(-2, -3)),
+      camera.shape + (image_size[1], image_size[0], 3),
   )
   return Rays.create(directions=directions, origins=origins)
 
@@ -167,6 +200,8 @@ def get_camera_from_rays(
     ransac_parameters: Optional[dict[str, Any]] = None,
 ) -> jaxcam.Camera:
   """Recovers a Camera from a ordered grid of rays.
+
+  Note: This function does not support batched rays.
 
   Performs a least-squares fit for a pinhole camera using DLT. See Sec 4.1 of
   Hartley and Zisserman [1] for more details. Note that the returned camera may
@@ -185,6 +220,8 @@ def get_camera_from_rays(
   Returns:
     camera: jaxcam.Camera.
   """
+  if rays.directions.ndim > 3:
+    raise ValueError('This function does not support batched rays.')
   position = jnp.mean(rays.origins, axis=(0, 1))
   height, width, _ = rays.directions.shape
   identity_camera = jaxcam.Camera.create(

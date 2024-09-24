@@ -50,7 +50,7 @@ def random_camera(
 class RaysTest(parameterized.TestCase):
 
   @parameterized.parameters(range(20))
-  def test_camera_to_ray_to_camera(self, seed):
+  def test_camera_from_rays_from_camera(self, seed):
     rng = jax.random.PRNGKey(seed)
     camera = random_camera(rng)
     rays = jax_rays.get_rays_from_camera(camera)
@@ -81,7 +81,7 @@ class RaysTest(parameterized.TestCase):
     )
 
   @parameterized.parameters(range(20))
-  def test_camera_to_ray_to_camera_with_noise(self, seed):
+  def test_camera_from_rays_from_camera_with_noise(self, seed):
     rng = jax.random.PRNGKey(seed)
     sigma = 1e-3
     ransac_paramters = {"num_iterations": 10}
@@ -125,6 +125,34 @@ class RaysTest(parameterized.TestCase):
     np.testing.assert_allclose(
         camera_recovered.position, camera.position, rtol=1e-3, atol=1e-3
     )
+
+  def test_rays_from_camera_batched(self):
+    # Test consistency
+    cameras = jaxcam.concatenate(
+        [random_camera(jax.random.PRNGKey(seed)) for seed in range(10)]
+    )
+    rays = jax_rays.get_rays_from_camera(
+        cameras, image_size=(_IMAGE_WIDTH, _IMAGE_HEIGHT)
+    )
+    rays_manual = [
+        jax_rays.get_rays_from_camera(
+            camera, image_size=(_IMAGE_WIDTH, _IMAGE_HEIGHT)
+        )
+        for camera in cameras
+    ]
+    directions_manual = jnp.stack([rays.directions for rays in rays_manual])
+    origins_manual = jnp.stack([rays.origins for rays in rays_manual])
+    np.testing.assert_allclose(rays.directions, directions_manual)
+    np.testing.assert_allclose(rays.origins, origins_manual)
+
+    # Test broadcasting
+    cameras = jaxcam.Camera.create(
+        orientation=jnp.broadcast_to(jnp.eye(3), (20, 10, 5, 3, 3)),
+        position=jnp.broadcast_to(jnp.zeros(3), (10, 5, 3)),
+        image_size=jnp.broadcast_to(jnp.array([512, 256]), (5, 2)),
+    )
+    rays = jax_rays.get_rays_from_camera(cameras, image_size=(512, 256))
+    self.assertEqual(rays.shape, (20, 10, 5, 256, 512, 6))
 
   @parameterized.parameters(range(10))
   def test_plucker_coordinates(self, seed):
