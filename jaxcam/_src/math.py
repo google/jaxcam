@@ -30,9 +30,9 @@ def matmul(a: jnp.ndarray, b: jnp.ndarray) -> jnp.ndarray:
   products.
 
   References:
-    https://github.com/google/jax#current-gotchas
-    https://github.com/google/jax/issues/2161
-    https://github.com/google/jax/issues/7010
+    https://github.com/jax-ml/jax#current-gotchas
+    https://github.com/jax-ml/jax/issues/2161
+    https://github.com/jax-ml/jax/issues/7010
 
   Args:
     a: the left matrix of a matmul.
@@ -48,9 +48,9 @@ def matvecmul(a: jnp.ndarray, b: jnp.ndarray) -> jnp.ndarray:
   """Matrix-vector product that prevents using bfloat16 on TPU.
 
   References:
-    https://github.com/google/jax#current-gotchas
-    https://github.com/google/jax/issues/2161
-    https://github.com/google/jax/issues/7010
+    https://github.com/jax-ml/jax#current-gotchas
+    https://github.com/jax-ml/jax/issues/2161
+    https://github.com/jax-ml/jax/issues/7010
 
   Args:
     a: the left matrix of a matrix-vector product.
@@ -66,9 +66,9 @@ def dot(a: jnp.ndarray, b: jnp.ndarray) -> jnp.ndarray:
   """Vector-vector dot product that prevents using bfloat16 on TPU.
 
   References:
-    https://github.com/google/jax#current-gotchas
-    https://github.com/google/jax/issues/2161
-    https://github.com/google/jax/issues/7010
+    https://github.com/jax-ml/jax#current-gotchas
+    https://github.com/jax-ml/jax/issues/2161
+    https://github.com/jax-ml/jax/issues/7010
 
   Args:
     a: the left vector of a dot product.

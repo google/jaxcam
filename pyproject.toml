@@ -21,9 +21,9 @@ dependencies = ["jax", "flax", "numpy", "etils[epath]"]
 dynamic = ["version"]
 
 [project.urls]
-homepage = "https://github.com/google/jaxcam"
-repository = "https://github.com/google/jaxcam"
-changelog = "https://github.com/google/jaxcam/blob/main/CHANGELOG.md"
+homepage = "https://github.com/jax-ml/jaxcam"
+repository = "https://github.com/jax-ml/jaxcam"
+changelog = "https://github.com/jax-ml/jaxcam/blob/main/CHANGELOG.md"
 # documentation = ""
 
 [project.optional-dependencies]

@@ -16,7 +16,7 @@
 
 # pylint: disable=g-multiple-import,g-importing-member,useless-import-alias,unused-import
 # Note: import <name> as <name> is required for names to be exported.
-# See PEP 484 & https://github.com/google/jax/issues/7570
+# See PEP 484 & https://github.com/jax-ml/jax/issues/7570
 from jaxcam._src.utils import (
     rts_to_sim3 as rts_to_sim3,
     sim3_to_rts as sim3_to_rts,

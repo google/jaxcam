@@ -20,7 +20,7 @@
 __version__ = '0.3.0'
 
 # Note: import <name> as <name> is required for names to be exported.
-# See PEP 484 & https://github.com/google/jax/issues/7570
+# See PEP 484 & https://github.com/jax-ml/jax/issues/7570
 from jaxcam._src.camera import (
     Camera as Camera,
     concatenate as concatenate,
