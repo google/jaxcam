@@ -86,6 +86,7 @@ class Camera:
     use_inverted_distortion: if True, the meaning of distort/undistort is
       flipped.
   """
+
   orientation: jnp.ndarray = _camera_field((3, 3))
   position: jnp.ndarray = _camera_field((3,))
   focal_length: Union[jnp.ndarray, float] = _camera_field(())
@@ -300,6 +301,28 @@ class Camera:
 
     return self.__class__(**kwargs)
 
+  def reshape(self, shape: tuple[int, ...]) -> 'Camera':
+    """Reshapes the camera."""
+    batch_axes = self.batch_axes()
+    if batch_axes is None:
+      raise ValueError('Cannot reshape unbatched camera.')
+
+    kwargs = {}
+    pytree_dict = self.pytree_dict()
+    for field in dataclasses.fields(self):
+      if (
+          field.name in pytree_dict
+          and getattr(batch_axes, field.name) is not None
+      ):
+        unbatched_shape = field.metadata['unbatched_shape']
+        array = self.__dict__[field.name]
+        array = array.reshape(shape + unbatched_shape)
+        kwargs[field.name] = array
+      else:
+        kwargs[field.name] = self.__dict__[field.name]
+
+    return self.__class__(**kwargs)
+
   def __iter__(self) -> Generator['Camera', None, None]:
     """Iterate over the camera batch.
 
@@ -465,7 +488,7 @@ def pixels_to_local_rays(
     camera: Camera, pixels: jnp.ndarray, normalize: bool = True
 ) -> jnp.ndarray:
   """Returns local ray directions for the provided pixels."""
-  y = ((pixels[..., 1] - camera.principal_point_y) / camera.scale_factor_y)
+  y = (pixels[..., 1] - camera.principal_point_y) / camera.scale_factor_y
   x = (
       pixels[..., 0] - camera.principal_point_x - y * camera.skew
   ) / camera.scale_factor_x
@@ -474,14 +497,17 @@ def pixels_to_local_rays(
 
   dirs = jnp.stack([x, y, jnp.ones_like(x)], axis=-1)
   if camera.projection_type is ProjectionType.FISHEYE:
-    theta = jnp.sqrt(x ** 2 + y ** 2)
+    theta = jnp.sqrt(x**2 + y**2)
     theta = jnp.minimum(jnp.pi, theta)
     sin_theta_over_theta = jnp.sin(theta) / theta
-    fisheye_dir = jnp.stack([
-        dirs[..., 0] * sin_theta_over_theta,
-        dirs[..., 1] * sin_theta_over_theta,
-        jnp.cos(theta),
-    ], axis=-1)
+    fisheye_dir = jnp.stack(
+        [
+            dirs[..., 0] * sin_theta_over_theta,
+            dirs[..., 1] * sin_theta_over_theta,
+            jnp.cos(theta),
+        ],
+        axis=-1,
+    )
     eps = jnp.finfo(x.dtype).eps
     # It is approximately perspective when the viewing ray is too close to the
     # optical axis.
@@ -825,7 +851,7 @@ def project(camera: Camera, points: jnp.ndarray) -> jnp.ndarray:
   x = local_x / local_z
   y = local_y / local_z
   if camera.projection_type is ProjectionType.FISHEYE:
-    r = jnp.sqrt(local_x ** 2 + local_y ** 2)
+    r = jnp.sqrt(local_x**2 + local_y**2)
     theta = jnp.arctan2(r, local_z)
     fisheye_x = theta / r * local_x
     fisheye_y = theta / r * local_y
@@ -838,8 +864,9 @@ def project(camera: Camera, points: jnp.ndarray) -> jnp.ndarray:
   # Map the distorted ray to the image plane and return the depth.
   pixel_x = camera.focal_length * x + camera.skew * y + camera.principal_point_x
   pixel_y = (
-      camera.focal_length * camera.pixel_aspect_ratio * y +
-      camera.principal_point_y)
+      camera.focal_length * camera.pixel_aspect_ratio * y
+      + camera.principal_point_y
+  )
 
   pixels = jnp.stack([pixel_x, pixel_y], axis=-1)
   return pixels.reshape((*batch_shape, 2))
@@ -924,7 +951,8 @@ def get_pixel_centers(image_width: int, image_height: int) -> jnp.ndarray:
   """Returns the pixel centers."""
   xx, yy = jnp.meshgrid(
       jnp.arange(image_width, dtype=jnp.float32),
-      jnp.arange(image_height, dtype=jnp.float32))
+      jnp.arange(image_height, dtype=jnp.float32),
+  )
   return jnp.stack([xx, yy], axis=-1) + 0.5
 
 
@@ -1012,12 +1040,19 @@ def concatenate(cameras: Sequence[Camera], axis: int = 0) -> Camera:
   if not all(c.ndim == cameras[0].ndim for c in cameras):
     dimensions = ', '.join([str(c.shape) for c in cameras])
     raise TypeError(
-        f'Cannot concatenate cameras with different numbers of dimensions'
-        f': got {dimensions}')
+        'Cannot concatenate cameras with different numbers of dimensions'
+        f': got {dimensions}'
+    )
 
   # Expand unbatched cameras.
-  cameras = [(c if c.shape else jax.tree.map(
-      functools.partial(jnp.expand_dims, axis=0), c)) for c in cameras]
+  cameras = [
+      (
+          c
+          if c.shape
+          else jax.tree.map(functools.partial(jnp.expand_dims, axis=0), c)
+      )
+      for c in cameras
+  ]
 
   cls = cameras[0].__class__
   kwargs = {}
