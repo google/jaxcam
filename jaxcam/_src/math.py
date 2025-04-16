@@ -14,16 +14,19 @@
 
 """Math utilities."""
 
+from typing import Union
+
 import jax
 from jax import numpy as jnp
+from numpy import typing as npt
 
 
-def einsum(*args, **kwargs) -> jnp.ndarray:
+def einsum(*args, **kwargs) -> npt.ArrayLike:
   """jnp.einsum uses bfloat16 by default on TPU, this prevents that."""
   return jnp.einsum(*args, **kwargs, precision=jax.lax.Precision.HIGHEST)
 
 
-def matmul(a: jnp.ndarray, b: jnp.ndarray) -> jnp.ndarray:
+def matmul(a: npt.ArrayLike, b: npt.ArrayLike) -> npt.ArrayLike:
   """jnp.matmul uses bfloat16 by default on TPU, this prevents that.
 
   Use matvecmul for matrix-vector products and dot for vector-vector dot
@@ -44,7 +47,7 @@ def matmul(a: jnp.ndarray, b: jnp.ndarray) -> jnp.ndarray:
   return jnp.matmul(a, b, precision=jax.lax.Precision.HIGHEST)
 
 
-def matvecmul(a: jnp.ndarray, b: jnp.ndarray) -> jnp.ndarray:
+def matvecmul(a: npt.ArrayLike, b: npt.ArrayLike) -> npt.ArrayLike:
   """Matrix-vector product that prevents using bfloat16 on TPU.
 
   References:
@@ -62,7 +65,7 @@ def matvecmul(a: jnp.ndarray, b: jnp.ndarray) -> jnp.ndarray:
   return einsum("...ij,...j->...i", a, b)
 
 
-def dot(a: jnp.ndarray, b: jnp.ndarray) -> jnp.ndarray:
+def dot(a: npt.ArrayLike, b: npt.ArrayLike) -> npt.ArrayLike:
   """Vector-vector dot product that prevents using bfloat16 on TPU.
 
   References:
@@ -80,7 +83,7 @@ def dot(a: jnp.ndarray, b: jnp.ndarray) -> jnp.ndarray:
   return einsum("...i,...i->...", a, b)
 
 
-def skew(vector: jnp.ndarray) -> jnp.ndarray:
+def skew(vector: npt.ArrayLike) -> npt.ArrayLike:
   """Builds a skew matrix ("cross product matrix") for a vector.
 
   References:
@@ -103,10 +106,10 @@ def skew(vector: jnp.ndarray) -> jnp.ndarray:
 
 
 def transform_point(
-    point: jnp.ndarray,
-    scale: jnp.ndarray,
-    rotation: jnp.ndarray,
-    translation: jnp.ndarray,
-) -> jnp.ndarray:
+    point: npt.ArrayLike,
+    scale: Union[float, npt.ArrayLike],
+    rotation: npt.ArrayLike,
+    translation: npt.ArrayLike,
+) -> npt.ArrayLike:
   """Transforms the given point x as `scale * rotation @ x + translation`."""
   return scale * matmul(rotation, point) + translation

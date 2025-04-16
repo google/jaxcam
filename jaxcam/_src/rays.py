@@ -15,11 +15,13 @@
 """Utilities for converting cameras to and from ray-based representations."""
 
 from typing import Any, Optional
+
 from flax import struct
 import jax
 import jax.numpy as jnp
 from jaxcam._src import camera as jaxcam
 from jaxcam._src import math
+from numpy import typing as npt
 
 
 @struct.dataclass
@@ -49,10 +51,10 @@ class Rays:
   @classmethod
   def create(
       cls,
-      directions: jnp.ndarray,
+      directions: npt.ArrayLike,
       *,
-      origins: Optional[jnp.ndarray] = None,
-      moments: Optional[jnp.ndarray] = None,
+      origins: Optional[npt.ArrayLike] = None,
+      moments: Optional[npt.ArrayLike] = None,
   ) -> 'Rays':
     """Creates a Rays object.
 
@@ -93,11 +95,11 @@ class Rays:
     return cls(directions=directions, origins=origins)
 
   @property
-  def moments(self) -> jnp.ndarray:
+  def moments(self) -> npt.ArrayLike:
     norm = jnp.linalg.norm(self.directions, axis=-1, keepdims=True)
     return jnp.cross(self.origins, self.directions / norm, axis=-1)
 
-  def to_raymap_6d(self, use_plucker: bool = False) -> jnp.ndarray:
+  def to_raymap_6d(self, use_plucker: bool = False) -> npt.ArrayLike:
     """Returns a 6D raymap representation of the rays.
 
     Raymap represents rays as [moments, directions] (Plücker coordinates) or
@@ -117,7 +119,7 @@ class Rays:
   @classmethod
   def from_raymap_6d(
       cls,
-      raymap: jnp.ndarray,
+      raymap: npt.ArrayLike,
       use_plucker: bool = False,
   ) -> 'Rays':
     """Creates a Rays object from a raymap representation."""
@@ -154,7 +156,7 @@ def get_rays_from_camera(
       the camera. If the camera is batched, image_size must be specified (unless
       disable_image_size_check is True) and must be consistent for all cameras.
     disable_image_size_check: If True, disables the image size check. This is
-    necessary for jitted functions, but use with caution.
+      necessary for jitted functions, but use with caution.
 
   Returns:
     Rays of shape (*camera.shape, H, W, 6).
@@ -256,7 +258,7 @@ def ray_dlt(
     directions2,
     use_ransac: bool = False,
     ransac_parameters: Optional[dict[str, Any]] = None,
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+) -> tuple[npt.ArrayLike, npt.ArrayLike, npt.ArrayLike]:
   """Solves for the optimal K and R transformation between two sets of rays.
 
   X2 ~ H @ X1 = R.T @ K_inv @ X1
@@ -305,12 +307,12 @@ def ray_dlt(
 @jax.jit
 def _compute_homography_transform_ransac(
     rng,
-    directions1: jnp.ndarray,
-    directions2: jnp.ndarray,
+    directions1: npt.ArrayLike,
+    directions2: npt.ArrayLike,
     num_iterations: int = 200,
     num_correspondences: int = 8,
     threshold_deg: float = 1.0,
-) -> jnp.ndarray:
+) -> npt.ArrayLike:
   """Solves for the optimal homography transform with RANSAC.
 
   Args:
@@ -362,17 +364,17 @@ def _compute_homography_transform_ransac(
 
 @jax.jit
 def _compute_homography_transform(
-    directions1: jnp.ndarray,
-    directions2: jnp.ndarray,
-) -> jnp.ndarray:
+    directions1: npt.ArrayLike,
+    directions2: npt.ArrayLike,
+) -> npt.ArrayLike:
   """Solves for the optimal homography transform between two sets of rays.
 
   Finds the homography transform H:
   x2 ~ H @ x1
 
   Args:
-    directions1 (jnp.ndarray): (N, 3).
-    directions2 (jnp.ndarray): (N, 3).
+    directions1 (npt.ArrayLike): (N, 3).
+    directions2 (npt.ArrayLike): (N, 3).
 
   Returns:
     A (3, 3) homography matrix.
@@ -397,8 +399,8 @@ def _compute_homography_transform(
 
 
 def _positivize(
-    calib: jnp.ndarray, rotation: jnp.ndarray
-) -> tuple[jnp.ndarray, jnp.ndarray]:
+    calib: npt.ArrayLike, rotation: npt.ArrayLike
+) -> tuple[npt.ArrayLike, npt.ArrayLike]:
   """Makes diagonal of calibration matrix positive.
 
   Ensures the diagonal entries of the calibration matrix (i.e. focal lengths)

@@ -108,15 +108,15 @@ class Camera:
   @classmethod
   def create(
       cls,
-      orientation: Optional[jnp.ndarray] = None,
-      position: Optional[jnp.ndarray] = None,
-      focal_length: Optional[jnp.ndarray] = None,
-      principal_point: Optional[jnp.ndarray] = None,
-      image_size: Optional[jnp.ndarray] = None,
-      skew: Union[jnp.ndarray, float] = 0.0,
-      pixel_aspect_ratio: Union[jnp.ndarray, float] = 1.0,
-      radial_distortion: Optional[jnp.ndarray] = None,
-      tangential_distortion: Optional[jnp.ndarray] = None,
+      orientation: Optional[npt.ArrayLike] = None,
+      position: Optional[npt.ArrayLike] = None,
+      focal_length: Optional[npt.ArrayLike] = None,
+      principal_point: Optional[npt.ArrayLike] = None,
+      image_size: Optional[npt.ArrayLike] = None,
+      skew: Union[npt.ArrayLike, float] = 0.0,
+      pixel_aspect_ratio: Union[npt.ArrayLike, float] = 1.0,
+      radial_distortion: Optional[npt.ArrayLike] = None,
+      tangential_distortion: Optional[npt.ArrayLike] = None,
       invert_distortion: bool = False,
       is_fisheye: bool = False,
   ) -> 'Camera':
@@ -346,31 +346,31 @@ class Camera:
       yield self[i]
 
   @property
-  def scale_factor_x(self) -> jnp.ndarray:
+  def scale_factor_x(self) -> npt.ArrayLike:
     return self.focal_length  # pytype: disable=bad-return-type  # jax-ndarray
 
   @property
-  def scale_factor_y(self) -> jnp.ndarray:
+  def scale_factor_y(self) -> npt.ArrayLike:
     return self.focal_length * self.pixel_aspect_ratio  # pytype: disable=bad-return-type  # jax-ndarray
 
   @property
-  def principal_point_x(self) -> jnp.ndarray:
+  def principal_point_x(self) -> npt.ArrayLike:
     return self.principal_point[..., 0]
 
   @property
-  def principal_point_y(self) -> jnp.ndarray:
+  def principal_point_y(self) -> npt.ArrayLike:
     return self.principal_point[..., 1]
 
   @property
-  def image_size_x(self) -> jnp.ndarray:
+  def image_size_x(self) -> npt.ArrayLike:
     return self.image_size[..., 0]
 
   @property
-  def image_size_y(self) -> jnp.ndarray:
+  def image_size_y(self) -> npt.ArrayLike:
     return self.image_size[..., 1]
 
   @property
-  def optical_axis(self) -> jnp.ndarray:
+  def optical_axis(self) -> npt.ArrayLike:
     return self.orientation[..., 2, :]
 
   @property
@@ -386,12 +386,12 @@ class Camera:
     return self.tangential_distortion is not None
 
   @property
-  def translation(self) -> jnp.ndarray:
+  def translation(self) -> npt.ArrayLike:
     # pylint: disable=invalid-unary-operand-type
     return math.matvecmul(-self.orientation, self.position)
 
   @property
-  def world_to_camera_matrix(self) -> jnp.ndarray:
+  def world_to_camera_matrix(self) -> npt.ArrayLike:
     """Returns the 4x4 matrix that takes world points to camera coordinates."""
     matrix = jnp.empty((*self.shape, 3, 4))
     matrix = matrix.at[..., :3, :3].set(self.orientation)
@@ -399,7 +399,7 @@ class Camera:
     return _to_matrix_4x4(matrix)
 
   @property
-  def camera_to_world_matrix(self) -> jnp.ndarray:
+  def camera_to_world_matrix(self) -> npt.ArrayLike:
     """Returns the 4x4 matrix that takes camera points to world coordinates."""
     matrix = jnp.empty((*self.shape, 3, 4))
     matrix = matrix.at[..., :3, :3].set(jnp.matrix_transpose(self.orientation))
@@ -407,7 +407,7 @@ class Camera:
     return _to_matrix_4x4(matrix)
 
   @property
-  def intrinsic_matrix(self) -> jnp.ndarray:
+  def intrinsic_matrix(self) -> npt.ArrayLike:
     """Returns the intrinsic matrix that maps local coordinates to pixels."""
     matrix = jnp.zeros((*self.shape, 3, 3))
     matrix = matrix.at[..., 0, 0].set(self.scale_factor_x)
@@ -441,8 +441,8 @@ def _to_matrix_4x4(matrix):
 
 
 def _distort_local_pixels(
-    camera: Camera, x: jnp.ndarray, y: jnp.ndarray
-) -> tuple[jnp.ndarray, jnp.ndarray]:
+    camera: Camera, x: npt.ArrayLike, y: npt.ArrayLike
+) -> tuple[npt.ArrayLike, npt.ArrayLike]:
   """Distorts normalized image pixels."""
   if camera.use_inverted_distortion:
     x, y = _radial_and_tangential_undistort(
@@ -463,8 +463,8 @@ def _distort_local_pixels(
 
 
 def _undistort_local_pixels(
-    camera: Camera, x: jnp.ndarray, y: jnp.ndarray
-) -> tuple[jnp.ndarray, jnp.ndarray]:
+    camera: Camera, x: npt.ArrayLike, y: npt.ArrayLike
+) -> tuple[npt.ArrayLike, npt.ArrayLike]:
   """Undistorts normalized image pixels."""
   if camera.use_inverted_distortion:
     x, y = _radial_and_tangential_distort(
@@ -485,8 +485,8 @@ def _undistort_local_pixels(
 
 
 def pixels_to_local_rays(
-    camera: Camera, pixels: jnp.ndarray, normalize: bool = True
-) -> jnp.ndarray:
+    camera: Camera, pixels: npt.ArrayLike, normalize: bool = True
+) -> npt.ArrayLike:
   """Returns local ray directions for the provided pixels."""
   y = (pixels[..., 1] - camera.principal_point_y) / camera.scale_factor_y
   x = (
@@ -523,9 +523,9 @@ def pixels_to_local_rays(
 
 def pixels_to_rays(
     camera: Camera,
-    pixels: jnp.ndarray,
+    pixels: npt.ArrayLike,
     normalize: bool = True,
-) -> jnp.ndarray:
+) -> npt.ArrayLike:
   """Returns world-space rays for the provided pixels.
 
   Args:
@@ -549,8 +549,8 @@ def pixels_to_rays(
 
 
 def pixels_to_points(
-    camera: Camera, pixels: jnp.ndarray, depth: jnp.ndarray
-) -> jnp.ndarray:
+    camera: Camera, pixels: npt.ArrayLike, depth: npt.ArrayLike
+) -> npt.ArrayLike:
   """Unprojects pixels and depth to (x,y,z,w) homogenous world-space points."""
   rays_through_pixels = pixels_to_rays(camera, pixels)
   ray_depth = depth_to_ray_depth(camera, rays_through_pixels, depth)
@@ -562,8 +562,8 @@ def pixels_to_points(
 
 def world_points_to_local_points(
     camera: Camera,
-    world_points: jnp.ndarray,
-) -> jnp.ndarray:
+    world_points: npt.ArrayLike,
+) -> npt.ArrayLike:
   """Transforms world-space (x,y,z) points to local-space (x,y,z) points.
 
   Local-space coordinates are also known as camera-space coordinates.
@@ -581,8 +581,8 @@ def world_points_to_local_points(
 
 def local_points_to_world_points(
     camera: Camera,
-    local_points: jnp.ndarray,
-) -> jnp.ndarray:
+    local_points: npt.ArrayLike,
+) -> npt.ArrayLike:
   """Transforms local-space (x,y,z) points to world-space (x,y,z) points.
 
   Local-space coordinates are also known as camera-space coordinates.
@@ -603,9 +603,9 @@ def local_points_to_world_points(
 
 def depth_to_ray_depth(
     camera: Camera,
-    ray: jnp.ndarray,
-    depth: jnp.ndarray,
-) -> jnp.ndarray:
+    ray: npt.ArrayLike,
+    depth: npt.ArrayLike,
+) -> npt.ArrayLike:
   """Converts depth along the optical axis to depth along ray.
 
   Args:
@@ -622,9 +622,9 @@ def depth_to_ray_depth(
 
 def ray_depth_to_depth(
     camera: Camera,
-    ray: jnp.ndarray,
-    ray_depth: jnp.ndarray,
-) -> jnp.ndarray:
+    ray: npt.ArrayLike,
+    ray_depth: npt.ArrayLike,
+) -> npt.ArrayLike:
   """Converts depth along ray to depth along the optical axis.
 
   Args:
@@ -639,7 +639,7 @@ def ray_depth_to_depth(
   return ray_depth * cosa
 
 
-def world_to_camera_matrix(camera: Camera) -> jnp.ndarray:
+def world_to_camera_matrix(camera: Camera) -> npt.ArrayLike:
   """Returns the 4x4 matrix that takes world points to camera coordinates.
 
   DEPRECATED: Use Camera.world_to_camera_matrix.
@@ -654,7 +654,7 @@ def world_to_camera_matrix(camera: Camera) -> jnp.ndarray:
 
 
 def update_world_to_camera_matrix(
-    camera: Camera, matrix: jnp.ndarray
+    camera: Camera, matrix: npt.ArrayLike
 ) -> Camera:
   """Sets the transform that takes world points to camera coordinates.
 
@@ -676,7 +676,7 @@ def update_world_to_camera_matrix(
   return camera.replace(position=position, orientation=orientation)
 
 
-def update_translation(camera: Camera, translation: jnp.ndarray) -> Camera:
+def update_translation(camera: Camera, translation: npt.ArrayLike) -> Camera:
   """Updates the translation of the camera.
 
   Args:
@@ -693,7 +693,7 @@ def update_translation(camera: Camera, translation: jnp.ndarray) -> Camera:
 
 
 def update_intrinsic_matrix(
-    camera: Camera, intrinsic_matrix: jnp.ndarray
+    camera: Camera, intrinsic_matrix: npt.ArrayLike
 ) -> Camera:
   """Sets the camera intrinsics based on an intrinsic matrix.
 
@@ -725,8 +725,8 @@ def update_intrinsic_matrix(
 
 
 def invert_radial_distortion_coefficients(
-    radial_distortion: jnp.ndarray,
-) -> jnp.ndarray:
+    radial_distortion: npt.ArrayLike,
+) -> npt.ArrayLike:
   """Inverts radial distortion parameters.
 
   This uses the exact inverse formula from Drap and Lefèvre (Sensors, 2016).
@@ -749,11 +749,11 @@ def invert_radial_distortion_coefficients(
 
 
 def _radial_and_tangential_distort(
-    x: jnp.ndarray,
-    y: jnp.ndarray,
-    radial_distortion: jnp.ndarray | None = None,
-    tangential_distortion: jnp.ndarray | None = None,
-) -> tuple[jnp.ndarray, jnp.ndarray]:
+    x: npt.ArrayLike,
+    y: npt.ArrayLike,
+    radial_distortion: Optional[npt.ArrayLike] = None,
+    tangential_distortion: Optional[npt.ArrayLike] = None,
+) -> tuple[npt.ArrayLike, npt.ArrayLike]:
   """Computes the distorted pixel positions."""
   dx_radial, dy_radial = 0.0, 0.0
   dx_tangential, dy_tangential = 0.0, 0.0
@@ -774,12 +774,12 @@ def _radial_and_tangential_distort(
 
 
 def _radial_and_tangential_undistort(
-    x_distorted: jnp.ndarray,
-    y_distorted: jnp.ndarray,
-    radial_distortion: jnp.ndarray,
-    tangential_distortion: jnp.ndarray,
+    x_distorted: npt.ArrayLike,
+    y_distorted: npt.ArrayLike,
+    radial_distortion: npt.ArrayLike,
+    tangential_distortion: npt.ArrayLike,
     max_iterations: int = 3,
-) -> tuple[jnp.ndarray, jnp.ndarray]:
+) -> tuple[npt.ArrayLike, npt.ArrayLike]:
   """Undistorts a point in image-space using an iterative optimization.
 
   This uses Newton-Raphson (related to Gauss-Newton) to find the undistorted
@@ -829,7 +829,7 @@ def _radial_and_tangential_undistort(
 
 
 @jax.jit
-def project(camera: Camera, points: jnp.ndarray) -> jnp.ndarray:
+def project(camera: Camera, points: npt.ArrayLike) -> npt.ArrayLike:
   """Projects world-space 3D points (x,y,z) to pixel positions (x,y).
 
   Args:
@@ -874,9 +874,9 @@ def project(camera: Camera, points: jnp.ndarray) -> jnp.ndarray:
 
 def look_at(
     camera: Camera,
-    eye: jnp.ndarray,
-    center: jnp.ndarray,
-    world_up: jnp.ndarray,
+    eye: npt.ArrayLike,
+    center: npt.ArrayLike,
+    world_up: npt.ArrayLike,
     camera_convention: str = 'opencv',
 ) -> Camera:
   """Applies a look-at transform to the given camera.
@@ -947,7 +947,7 @@ def look_at(
   return update_world_to_camera_matrix(camera, cam_from_world)
 
 
-def get_pixel_centers(image_width: int, image_height: int) -> jnp.ndarray:
+def get_pixel_centers(image_width: int, image_height: int) -> npt.ArrayLike:
   """Returns the pixel centers."""
   xx, yy = jnp.meshgrid(
       jnp.arange(image_width, dtype=jnp.float32),
@@ -963,7 +963,7 @@ def scale(camera: Camera, amount: float | jnp.ndarray) -> Camera:
   return scale_to_image_size(camera, new_image_size)
 
 
-def scale_to_image_size(camera: Camera, image_size: jnp.ndarray) -> Camera:
+def scale_to_image_size(camera: Camera, image_size: npt.ArrayLike) -> Camera:
   """Scales the camera to the given image size."""
   scale_xy = image_size / camera.image_size
   scale_x = scale_xy[..., 0]
@@ -1082,9 +1082,9 @@ def concatenate(cameras: Sequence[Camera], axis: int = 0) -> Camera:
 
 def transform(
     camera: Camera,
-    scale: jnp.ndarray,  # pylint: disable=redefined-outer-name
-    rotation: jnp.ndarray,
-    translation: jnp.ndarray,
+    scale: npt.ArrayLike,  # pylint: disable=redefined-outer-name
+    rotation: npt.ArrayLike,
+    translation: npt.ArrayLike,
 ) -> Camera:
   """Applies a similarity transform to the camera.
 
@@ -1114,7 +1114,7 @@ def transform(
   return camera.replace(orientation=new_orientation, position=new_position)
 
 
-def relative_transform(reference: Camera, target: Camera) -> jnp.ndarray:
+def relative_transform(reference: Camera, target: Camera) -> npt.ArrayLike:
   """Computes the transform from reference camera to the target camera.
 
   The transform relativizes the camera such that the target cameras are in the
@@ -1135,7 +1135,7 @@ def relative_transform(reference: Camera, target: Camera) -> jnp.ndarray:
   )
 
 
-def essential_matrix(reference: Camera, target: Camera) -> jnp.ndarray:
+def essential_matrix(reference: Camera, target: Camera) -> npt.ArrayLike:
   """Computes the essential matrix between two cameras.
 
   The essential matrix will be computed based on the transformation from the
@@ -1156,7 +1156,7 @@ def essential_matrix(reference: Camera, target: Camera) -> jnp.ndarray:
   return math.matmul(math.skew(rel_target.translation), rel_target.orientation)
 
 
-def fundamental_matrix(reference: Camera, target: Camera) -> jnp.ndarray:
+def fundamental_matrix(reference: Camera, target: Camera) -> npt.ArrayLike:
   """Computes the fundamental matrix between two cameras.
 
   References:

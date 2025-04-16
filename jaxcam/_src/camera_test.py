@@ -17,7 +17,6 @@
 from absl.testing import absltest
 from absl.testing import parameterized
 import jax
-from jax import numpy as jnp
 from jax import random
 import jaxcam
 from jaxcam._src import math
@@ -67,13 +66,13 @@ def random_camera(
 ):
   rng, key = random.split(rng)
   position = random.normal(key, (3,))
-  position = radius * position / jnp.linalg.norm(position)
+  position = radius * position / np.linalg.norm(position)
   camera = jaxcam.Camera.create(
-      focal_length=jnp.array(_FOCAL_LENGTH),
-      image_size=jnp.array((_IMAGE_WIDTH, _IMAGE_HEIGHT)),
+      focal_length=np.array(_FOCAL_LENGTH),
+      image_size=np.array((_IMAGE_WIDTH, _IMAGE_HEIGHT)),
   )
   camera = jaxcam.look_at(
-      camera, eye=position, center=jnp.array(look_at), world_up=jnp.array(up)
+      camera, eye=position, center=np.array(look_at), world_up=np.array(up)
   )
   return camera
 
@@ -89,17 +88,17 @@ class CameraTest(parameterized.TestCase):
 
     np.testing.assert_allclose(
         camera.world_to_camera_matrix,
-        jnp.linalg.inv(camera.camera_to_world_matrix),
+        np.linalg.inv(camera.camera_to_world_matrix),
         atol=1e-6,
     )
     np.testing.assert_allclose(
         camera.camera_to_world_matrix,
-        jnp.linalg.inv(camera.world_to_camera_matrix),
+        np.linalg.inv(camera.world_to_camera_matrix),
         atol=1e-6,
     )
     np.testing.assert_allclose(
         camera.world_to_camera_matrix @ camera.camera_to_world_matrix,
-        jnp.eye(4),
+        np.eye(4),
         atol=1e-6,
     )
 
@@ -157,14 +156,14 @@ class CameraTest(parameterized.TestCase):
   def test_world_points_to_local_points_regression(self):
     camera = jaxcam.Camera.create(
         orientation=_SAMPLE_ROTATION,
-        position=jnp.array([0.5, 1.5, 2.5]),
+        position=np.array([0.5, 1.5, 2.5]),
     )
 
     # Since there are no proper regression tests, the old code is copied here.
     def world_points_to_local_points_old(
         camera: jaxcam.Camera,
-        world_points: jnp.ndarray,
-    ) -> jnp.ndarray:
+        world_points: np.ndarray,
+    ) -> np.ndarray:
       world_points_flat = world_points.reshape((-1, 3))
       translated_points = world_points_flat - camera.position
       local_points = (math.matmul(camera.orientation, translated_points.T)).T
@@ -178,13 +177,13 @@ class CameraTest(parameterized.TestCase):
   def test_local_points_to_world_points_regression(self):
     camera = jaxcam.Camera.create(
         orientation=_SAMPLE_ROTATION,
-        position=jnp.array([0.5, 1.5, 2.5]),
+        position=np.array([0.5, 1.5, 2.5]),
     )
 
     # Since there are no proper regression tests, the old code is copied here.
     def local_points_to_world_points_old(
-        camera: jaxcam.Camera, local_points: jnp.ndarray
-    ) -> jnp.ndarray:
+        camera: jaxcam.Camera, local_points: np.ndarray
+    ) -> np.ndarray:
       local_points_flat = local_points.reshape((-1, 3))
       rotated_points = math.matmul(camera.orientation.T, local_points_flat.T).T
       world_points = rotated_points + camera.position
@@ -201,14 +200,14 @@ class CameraTest(parameterized.TestCase):
     # Since there are no proper regression tests, the old code is copied here.
     def depth_to_ray_depth_old(
         camera: jaxcam.Camera,
-        ray: jnp.ndarray,
-        depth: jnp.ndarray,
-    ) -> jnp.ndarray:
+        ray: np.ndarray,
+        depth: np.ndarray,
+    ) -> np.ndarray:
       cosa = math.matmul(ray, camera.optical_axis)
       return depth / cosa
 
-    rays = jnp.array([[1.0, 2.0, 3.0], [2.0, 3.0, 4.0]])
-    depths = jnp.array([1.0, 1.0])
+    rays = np.array([[1.0, 2.0, 3.0], [2.0, 3.0, 4.0]])
+    depths = np.array([1.0, 1.0])
     np.testing.assert_allclose(
         jaxcam.depth_to_ray_depth(camera, rays, depths),
         depth_to_ray_depth_old(camera, rays, depths),
@@ -220,14 +219,14 @@ class CameraTest(parameterized.TestCase):
     # Since there are no proper regression tests, the old code is copied here.
     def ray_depth_to_depth_old(
         camera: jaxcam.Camera,
-        ray: jnp.ndarray,
-        ray_depth: jnp.ndarray,
-    ) -> jnp.ndarray:
+        ray: np.ndarray,
+        ray_depth: np.ndarray,
+    ) -> np.ndarray:
       cosa = math.matmul(ray, camera.optical_axis)
       return ray_depth * cosa
 
-    rays = jnp.array([[1.0, 2.0, 3.0], [2.0, 3.0, 4.0]])
-    depths = jnp.array([1.0, 1.0])
+    rays = np.array([[1.0, 2.0, 3.0], [2.0, 3.0, 4.0]])
+    depths = np.array([1.0, 1.0])
     np.testing.assert_allclose(
         jaxcam.ray_depth_to_depth(camera, rays, depths),
         ray_depth_to_depth_old(camera, rays, depths),
@@ -238,7 +237,7 @@ class CameraTest(parameterized.TestCase):
     camera = jaxcam.Camera.create(
         orientation=_SAMPLE_ROTATION,
     )
-    pixels = jnp.array([
+    pixels = np.array([
         [0.1, 0.1],
         [0.9, 0.9],
         [1.8, 1.8],
@@ -247,14 +246,14 @@ class CameraTest(parameterized.TestCase):
     # Since there are no proper regression tests, the old code is copied here.
     def pixels_to_rays_old(
         camera: jaxcam.Camera,
-        pixels: jnp.ndarray,
+        pixels: np.ndarray,
         normalize: bool,
-    ) -> jnp.ndarray:
+    ) -> np.ndarray:
       if pixels.shape[-1] != 2:
         raise ValueError("The last dimension of pixels must be 2.")
 
       batch_shape = pixels.shape[:-1]
-      pixels = jnp.reshape(pixels, (-1, 2))
+      pixels = np.reshape(pixels, (-1, 2))
 
       local_rays_dir = jaxcam.pixels_to_local_rays(
           camera,
@@ -262,10 +261,10 @@ class CameraTest(parameterized.TestCase):
           normalize=normalize,
       )
       rays_dir = math.matmul(
-          jnp.swapaxes(camera.orientation, -1, -2),
-          local_rays_dir[..., jnp.newaxis],
+          np.swapaxes(camera.orientation, -1, -2),
+          local_rays_dir[..., np.newaxis],
       )
-      rays_dir = jnp.squeeze(rays_dir, axis=-1)
+      rays_dir = np.squeeze(rays_dir, axis=-1)
       rays_dir = rays_dir.reshape((*batch_shape, 3))
       return rays_dir
 
@@ -278,7 +277,7 @@ class CameraTest(parameterized.TestCase):
   def test_batched_translation(self, batch_shapes):
     batch_shape, *_ = batch_shapes
     camera = jaxcam.Camera.create(
-        orientation=jnp.broadcast_to(jnp.eye(3), (*batch_shape, 3, 3)),
+        orientation=np.broadcast_to(np.eye(3), (*batch_shape, 3, 3)),
     )
     assert camera.translation.shape == (*batch_shape, 3)
 
@@ -286,11 +285,11 @@ class CameraTest(parameterized.TestCase):
   def test_batched_world_points_to_local_points(self, batch_shapes):
     batch_shape_a, batch_shape_b, *_ = batch_shapes
     camera = jaxcam.Camera.create(
-        orientation=jnp.broadcast_to(jnp.eye(3), (*batch_shape_a, 3, 3)),
+        orientation=np.broadcast_to(np.eye(3), (*batch_shape_a, 3, 3)),
     )
-    points = jnp.zeros((*batch_shape_b, 3))
+    points = np.zeros((*batch_shape_b, 3))
     assert jaxcam.world_points_to_local_points(camera, points).shape == (
-        *jnp.broadcast_shapes(batch_shape_a, batch_shape_b),
+        *np.broadcast_shapes(batch_shape_a, batch_shape_b),
         3,
     )
 
@@ -298,11 +297,11 @@ class CameraTest(parameterized.TestCase):
   def test_batched_local_points_to_world_points(self, batch_shapes):
     batch_shape_a, batch_shape_b, *_ = batch_shapes
     camera = jaxcam.Camera.create(
-        orientation=jnp.broadcast_to(jnp.eye(3), (*batch_shape_a, 3, 3)),
+        orientation=np.broadcast_to(np.eye(3), (*batch_shape_a, 3, 3)),
     )
-    local_points = jnp.zeros((*batch_shape_b, 3))
+    local_points = np.zeros((*batch_shape_b, 3))
     assert jaxcam.local_points_to_world_points(camera, local_points).shape == (
-        *jnp.broadcast_shapes(batch_shape_a, batch_shape_b),
+        *np.broadcast_shapes(batch_shape_a, batch_shape_b),
         3,
     )
 
@@ -310,25 +309,25 @@ class CameraTest(parameterized.TestCase):
   def test_batched_depth_to_ray_depth(self, batch_shapes):
     batch_shape_a, batch_shape_b, batch_shape_c = batch_shapes
     camera = jaxcam.Camera.create(
-        orientation=jnp.broadcast_to(jnp.eye(3), (*batch_shape_a, 3, 3)),
+        orientation=np.broadcast_to(np.eye(3), (*batch_shape_a, 3, 3)),
     )
-    rays = jnp.ones((*batch_shape_b, 3))
-    depth = jnp.ones(batch_shape_c)
+    rays = np.ones((*batch_shape_b, 3))
+    depth = np.ones(batch_shape_c)
     assert jaxcam.depth_to_ray_depth(
         camera, rays, depth
-    ).shape == jnp.broadcast_shapes(*batch_shapes)
+    ).shape == np.broadcast_shapes(*batch_shapes)
 
   @parameterized.product(batch_shapes=_SHAPES_THAT_BROADCAST)
   def test_batched_ray_depth_to_depth(self, batch_shapes):
     batch_shape_a, batch_shape_b, batch_shape_c = batch_shapes
     camera = jaxcam.Camera.create(
-        orientation=jnp.broadcast_to(jnp.eye(3), (*batch_shape_a, 3, 3)),
+        orientation=np.broadcast_to(np.eye(3), (*batch_shape_a, 3, 3)),
     )
-    rays = jnp.ones((*batch_shape_b, 3))
-    depth = jnp.ones(batch_shape_c)
+    rays = np.ones((*batch_shape_b, 3))
+    depth = np.ones(batch_shape_c)
     assert jaxcam.ray_depth_to_depth(
         camera, rays, depth
-    ).shape == jnp.broadcast_shapes(*batch_shapes)
+    ).shape == np.broadcast_shapes(*batch_shapes)
 
   @parameterized.product(
       normalize_rays=[True, False],
@@ -337,11 +336,11 @@ class CameraTest(parameterized.TestCase):
   def test_batched_pixels_to_rays(self, normalize_rays, batch_shape):
     batch_shape_a, batch_shape_b, *_ = batch_shape
     camera = jaxcam.Camera.create(
-        orientation=jnp.broadcast_to(_SAMPLE_ROTATION, (*batch_shape_a, 3, 3)),
+        orientation=np.broadcast_to(_SAMPLE_ROTATION, (*batch_shape_a, 3, 3)),
     )
-    pixels = jnp.zeros((*batch_shape_b, 2))
+    pixels = np.zeros((*batch_shape_b, 2))
     assert jaxcam.pixels_to_rays(camera, pixels, normalize_rays).shape == (
-        *jnp.broadcast_shapes(batch_shape_a, batch_shape_b),
+        *np.broadcast_shapes(batch_shape_a, batch_shape_b),
         3,
     )
 
@@ -349,7 +348,7 @@ class CameraTest(parameterized.TestCase):
   def test_batched_camera_to_world_matrix(self, batch_shapes):
     batch_shape, *_ = batch_shapes
     cameras = jaxcam.Camera.create(
-        orientation=jnp.broadcast_to(jnp.eye(3), (*batch_shape, 3, 3)),
+        orientation=np.broadcast_to(np.eye(3), (*batch_shape, 3, 3)),
     )
     assert cameras.camera_to_world_matrix.shape == (*batch_shape, 4, 4)
 
@@ -364,7 +363,7 @@ class CameraTest(parameterized.TestCase):
   )
   def test_camera_reshape(self, batch_shapes):
     shape1, shape2 = batch_shapes
-    camera1 = jaxcam.create(jnp.broadcast_to(jnp.eye(3), shape1 + (3, 3)))
+    camera1 = jaxcam.create(np.broadcast_to(np.eye(3), shape1 + (3, 3)))
     camera2 = camera1.reshape(shape2)
     assert camera2.shape == shape2
 

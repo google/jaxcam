@@ -16,16 +16,18 @@
 """
 
 from typing import Tuple
+
 import jax
-import jax.numpy as jnp
 import jaxcam
 from jaxcam._src import math
+import numpy as np
+from numpy import typing as npt
 import optax
 
 
 def rts_to_sim3(
-    rotation: jnp.ndarray, translation: jnp.ndarray, scale: float
-) -> jnp.ndarray:
+    rotation: npt.ArrayLike, translation: npt.ArrayLike, scale: float
+) -> npt.ArrayLike:
   """Converts a rotation, translation and scale to a homogeneous transform.
 
   Args:
@@ -37,7 +39,7 @@ def rts_to_sim3(
     (4, 4) A homogeneous transformation matrix.
   """
 
-  transform = jnp.eye(4)
+  transform = np.eye(4)
   transform = transform.at[:3, :3].set(rotation * scale)
   transform = transform.at[:3, 3].set(translation)
 
@@ -45,8 +47,8 @@ def rts_to_sim3(
 
 
 def sim3_to_rts(
-    transform: jnp.ndarray,
-) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    transform: npt.ArrayLike,
+) -> Tuple[npt.ArrayLike, npt.ArrayLike, npt.ArrayLike]:
   """Converts a homogeneous transform to rotation, translation and scale.
 
   Args:
@@ -58,7 +60,7 @@ def sim3_to_rts(
     scale: A scalar factor.
   """
 
-  eps = jnp.float32(jnp.finfo(jnp.float32).tiny)
+  eps = np.float32(np.finfo(np.float32).tiny)
   rotation_scale = transform[..., :3, :3]
   # Assumes rotation is an orthonormal transform, thus taking norm of first row.
   scale = optax.safe_norm(rotation_scale, min_norm=eps, axis=1)[0]
@@ -86,7 +88,7 @@ def relativize_cameras(
   """
 
   transform = jaxcam.relative_transform(reference, target)
-  rel_reference = jaxcam.update_world_to_camera_matrix(reference, jnp.eye(4))
+  rel_reference = jaxcam.update_world_to_camera_matrix(reference, np.eye(4))
   rel_target = jaxcam.update_world_to_camera_matrix(target, transform)
   return rel_reference, rel_target
 
@@ -122,7 +124,7 @@ def transform_to_identity_rotation(
 ) -> jaxcam.Camera:
   """Transforms a camera to have an identity rotation."""
   rotation = camera.orientation.T
-  transform = rts_to_sim3(rotation, jnp.zeros(3), 1.0)
+  transform = rts_to_sim3(rotation, np.zeros(3), 1.0)
   return transform_camera(camera, transform)
 
 
@@ -145,7 +147,7 @@ def relativize_rotation(
   """
 
   transform = reference.orientation.T
-  transform = rts_to_sim3(transform, jnp.zeros(3), 1.0)
+  transform = rts_to_sim3(transform, np.zeros(3), 1.0)
   rel_reference = transform_camera(reference, transform)
   rel_target = transform_camera(target, transform)
   return rel_reference, rel_target

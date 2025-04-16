@@ -18,7 +18,6 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import jax
 from jax import random
-import jax.numpy as jnp
 import jaxcam
 from jaxcam._src import rays as jax_rays
 import numpy as np
@@ -29,20 +28,19 @@ _FOCAL_LENGTH = 512
 
 
 def random_camera(
-    rng,
+    key,
     radius: int = 1,
     look_at: tuple[float, float, float] = (0.0, 0.0, 0.0),
     up: tuple[float, float, float] = (0.0, 1.0, 0.0),
 ):
-  rng, key = random.split(rng)
   position = random.normal(key, (3,))
-  position = radius * position / jnp.linalg.norm(position)
+  position = radius * position / np.linalg.norm(position)
   camera = jaxcam.Camera.create(
-      focal_length=jnp.array(_FOCAL_LENGTH),
-      image_size=jnp.array((_IMAGE_WIDTH, _IMAGE_HEIGHT)),
+      focal_length=np.array(_FOCAL_LENGTH),
+      image_size=np.array((_IMAGE_WIDTH, _IMAGE_HEIGHT)),
   )
   camera = jaxcam.look_at(
-      camera, eye=position, center=jnp.array(look_at), world_up=jnp.array(up)
+      camera, eye=position, center=np.array(look_at), world_up=np.array(up)
   )
   return camera
 
@@ -140,16 +138,16 @@ class RaysTest(parameterized.TestCase):
         )
         for camera in cameras
     ]
-    directions_manual = jnp.stack([rays.directions for rays in rays_manual])
-    origins_manual = jnp.stack([rays.origins for rays in rays_manual])
+    directions_manual = np.stack([rays.directions for rays in rays_manual])
+    origins_manual = np.stack([rays.origins for rays in rays_manual])
     np.testing.assert_allclose(rays.directions, directions_manual)
     np.testing.assert_allclose(rays.origins, origins_manual)
 
     # Test broadcasting
     cameras = jaxcam.Camera.create(
-        orientation=jnp.broadcast_to(jnp.eye(3), (20, 10, 5, 3, 3)),
-        position=jnp.broadcast_to(jnp.zeros(3), (10, 5, 3)),
-        image_size=jnp.broadcast_to(jnp.array([512, 256]), (5, 2)),
+        orientation=np.broadcast_to(np.eye(3), (20, 10, 5, 3, 3)),
+        position=np.broadcast_to(np.zeros(3), (10, 5, 3)),
+        image_size=np.broadcast_to(np.array([512, 256]), (5, 2)),
     )
     rays = jax_rays.get_rays_from_camera(cameras, image_size=(512, 256))
     self.assertEqual(rays.shape, (20, 10, 5, 256, 512, 6))
@@ -162,7 +160,7 @@ class RaysTest(parameterized.TestCase):
     rays = jax_rays.get_rays_from_camera(camera)
     np.testing.assert_allclose(
         rays.moments,
-        jnp.cross(rays.origins, rays.directions, axis=-1),
+        np.cross(rays.origins, rays.directions, axis=-1),
         atol=1e-6,
     )
     magnitude = jax.random.uniform(
@@ -175,7 +173,7 @@ class RaysTest(parameterized.TestCase):
     # Check that the origins of new rays are on the old rays. The origins of the
     # ray computed using the moments will be the point closest to the world
     # origin, which is not necessarily the same as the original origin.
-    t = jnp.sum(
+    t = np.sum(
         (new_rays.origins - rays.origins) * rays.directions,
         axis=-1,
         keepdims=True,
