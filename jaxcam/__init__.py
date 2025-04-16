@@ -39,6 +39,7 @@ from jaxcam._src.camera import (
     project as project,
     ray_depth_to_depth as ray_depth_to_depth,
     relative_transform as relative_transform,
+    replace_backend as replace_backend,
     scale_to_image_size as scale_to_image_size,
     scale as scale,
     transform as transform,
