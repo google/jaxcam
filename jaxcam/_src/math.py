@@ -18,69 +18,55 @@ from typing import Union
 
 import jax
 from jax import numpy as jnp
+import numpy as onp
 from numpy import typing as npt
 
 
-def einsum(*args, **kwargs) -> npt.ArrayLike:
-  """jnp.einsum uses bfloat16 by default on TPU, this prevents that."""
-  return jnp.einsum(*args, **kwargs, precision=jax.lax.Precision.HIGHEST)
+def einsum(subscripts: str, /, *operands: npt.ArrayLike) -> npt.ArrayLike:
+  """jnp.einsum uses bfloat16 by default on TPU, this prevents that.
+
+  References:
+    https://github.com/jax-ml/jax#current-gotchas
+    https://github.com/jax-ml/jax/issues/2161
+    https://github.com/jax-ml/jax/issues/7010
+
+  Args:
+    subscripts: The einsum subscripts.
+    *operands: The operands for the einsum.
+
+  Returns:
+    The result of xnp.einsum(subscripts, *operands, precision=HIGHEST)
+  """
+  xnp = operands[0].__array_namespace__()
+  if xnp is jnp:
+    return jnp.einsum(
+        subscripts, *operands, precision=jax.lax.Precision.HIGHEST
+    )
+  elif xnp is onp:
+    return onp.einsum(subscripts, *operands)
+  else:
+    raise ValueError(f'Unsupported numpy-like module: {xnp}')
 
 
 def matmul(a: npt.ArrayLike, b: npt.ArrayLike) -> npt.ArrayLike:
-  """jnp.matmul uses bfloat16 by default on TPU, this prevents that.
-
-  Use matvecmul for matrix-vector products and dot for vector-vector dot
-  products.
-
-  References:
-    https://github.com/jax-ml/jax#current-gotchas
-    https://github.com/jax-ml/jax/issues/2161
-    https://github.com/jax-ml/jax/issues/7010
-
-  Args:
-    a: the left matrix of a matmul.
-    b: the right matrix of a matmul.
-
-  Returns:
-    The result of the matmul.
-  """
-  return jnp.matmul(a, b, precision=jax.lax.Precision.HIGHEST)
+  """Matrix-matrix product that prevents uses bfloat16 by default on TPU."""
+  xnp = a.__array_namespace__()
+  if xnp is jnp:
+    return jnp.matmul(a, b, precision=jax.lax.Precision.HIGHEST)
+  elif xnp is onp:
+    return onp.matmul(a, b)
+  else:
+    raise ValueError(f'Unsupported numpy-like module: {xnp}')
 
 
 def matvecmul(a: npt.ArrayLike, b: npt.ArrayLike) -> npt.ArrayLike:
-  """Matrix-vector product that prevents using bfloat16 on TPU.
-
-  References:
-    https://github.com/jax-ml/jax#current-gotchas
-    https://github.com/jax-ml/jax/issues/2161
-    https://github.com/jax-ml/jax/issues/7010
-
-  Args:
-    a: the left matrix of a matrix-vector product.
-    b: the right vector of a matrix-vector product.
-
-  Returns:
-    The result of the matrix-vector product.
-  """
-  return einsum("...ij,...j->...i", a, b)
+  """Matrix-vector product that prevents using bfloat16 on TPU."""
+  return einsum('...ij,...j->...i', a, b)
 
 
 def dot(a: npt.ArrayLike, b: npt.ArrayLike) -> npt.ArrayLike:
-  """Vector-vector dot product that prevents using bfloat16 on TPU.
-
-  References:
-    https://github.com/jax-ml/jax#current-gotchas
-    https://github.com/jax-ml/jax/issues/2161
-    https://github.com/jax-ml/jax/issues/7010
-
-  Args:
-    a: the left vector of a dot product.
-    b: the right vector of a dot product.
-
-  Returns:
-    The result of the dot product.
-  """
-  return einsum("...i,...i->...", a, b)
+  """Vector-vector dot product that prevents using bfloat16 on TPU."""
+  return einsum('...i,...i->...', a, b)
 
 
 def skew(vector: npt.ArrayLike) -> npt.ArrayLike:
@@ -97,8 +83,9 @@ def skew(vector: npt.ArrayLike) -> npt.ArrayLike:
     vector, W is the corresponding skew-symmatrix matrix, and v is another
     vector.
   """
-  vector = jnp.reshape(vector, (3))
-  return jnp.array([
+  xnp = vector.__array_namespace__()
+  vector = xnp.reshape(vector, (3))
+  return xnp.array([
       [0.0, -vector[2], vector[1]],
       [vector[2], 0.0, -vector[0]],
       [-vector[1], vector[0], 0.0],

@@ -25,7 +25,9 @@ from flax import struct
 import jax
 import jax.numpy as jnp
 from jaxcam._src import math
-from numpy import typing as npt
+import numpy as onp
+
+ArrayLike = onp.typing.ArrayLike
 
 
 def _camera_field(unbatched_shape: tuple[int, ...], **kwargs) -> ...:
@@ -85,17 +87,18 @@ class Camera:
     has_tangential_distortion: will be True if tangential distortion is enabled.
     use_inverted_distortion: if True, the meaning of distort/undistort is
       flipped.
+    xnp: the numpy-like module to use (e.g. jnp or np).
   """
 
-  orientation: jnp.ndarray = _camera_field((3, 3))
-  position: jnp.ndarray = _camera_field((3,))
-  focal_length: Union[jnp.ndarray, float] = _camera_field(())
-  principal_point: jnp.ndarray = _camera_field((2,))
-  image_size: jnp.ndarray = _camera_field((2,))
-  skew: Union[jnp.ndarray, float] = _camera_field(())
-  pixel_aspect_ratio: Union[jnp.ndarray, float] = _camera_field(())
-  radial_distortion: jnp.ndarray | None = _camera_field((4,), default=None)
-  tangential_distortion: jnp.ndarray | None = _camera_field((2,), default=None)
+  orientation: ArrayLike = _camera_field((3, 3))
+  position: ArrayLike = _camera_field((3,))
+  focal_length: Union[ArrayLike, float] = _camera_field(())
+  principal_point: ArrayLike = _camera_field((2,))
+  image_size: ArrayLike = _camera_field((2,))
+  skew: Union[ArrayLike, float] = _camera_field(())
+  pixel_aspect_ratio: Union[ArrayLike, float] = _camera_field(())
+  radial_distortion: Optional[ArrayLike] = _camera_field((4,), default=None)
+  tangential_distortion: Optional[ArrayLike] = _camera_field((2,), default=None)
 
   # Non-pytree fields. For example, options to control camera logic. Logic is
   # baked in when jitting, so these fields do not need to be passed into jitted
@@ -104,29 +107,33 @@ class Camera:
       pytree_node=False, default=ProjectionType.PERSPECTIVE
   )
   use_inverted_distortion: bool = struct.field(pytree_node=False, default=False)
+  xnp: Union[type(jnp), type(onp)] = struct.field(
+      pytree_node=False, default=jnp
+  )
 
   @classmethod
   def create(
       cls,
-      orientation: Optional[npt.ArrayLike] = None,
-      position: Optional[npt.ArrayLike] = None,
-      focal_length: Optional[npt.ArrayLike] = None,
-      principal_point: Optional[npt.ArrayLike] = None,
-      image_size: Optional[npt.ArrayLike] = None,
-      skew: Union[npt.ArrayLike, float] = 0.0,
-      pixel_aspect_ratio: Union[npt.ArrayLike, float] = 1.0,
-      radial_distortion: Optional[npt.ArrayLike] = None,
-      tangential_distortion: Optional[npt.ArrayLike] = None,
+      orientation: Optional[ArrayLike] = None,
+      position: Optional[ArrayLike] = None,
+      focal_length: Optional[ArrayLike] = None,
+      principal_point: Optional[ArrayLike] = None,
+      image_size: Optional[ArrayLike] = None,
+      skew: Union[ArrayLike, float] = 0.0,
+      pixel_aspect_ratio: Union[ArrayLike, float] = 1.0,
+      radial_distortion: Optional[ArrayLike] = None,
+      tangential_distortion: Optional[ArrayLike] = None,
       invert_distortion: bool = False,
       is_fisheye: bool = False,
+      xnp: Union[type(jnp), type(onp)] = jnp,
   ) -> 'Camera':
     """Creates a camera with reasonable default values."""
     if position is None:
-      position = jnp.zeros(3)
+      position = xnp.zeros(3)
     if orientation is None:
-      orientation = jnp.eye(3)
+      orientation = xnp.eye(3)
     if image_size is None:
-      image_size = jnp.ones(2)
+      image_size = xnp.ones(2)
     if principal_point is None:
       principal_point = image_size / 2.0
     if focal_length is None:
@@ -136,7 +143,7 @@ class Camera:
     # Ensure all items are strongly typed arrays to avoid triggering a cache
     # miss during JIT compilation due to weak type semantics.
     # See: https://jax.readthedocs.io/en/latest/type_promotion.html
-    asarray = functools.partial(jnp.asarray, dtype=jnp.float32)
+    asarray = functools.partial(xnp.asarray, dtype=xnp.float32)
 
     kwargs = {
         'orientation': asarray(orientation),
@@ -150,7 +157,7 @@ class Camera:
 
     if radial_distortion is not None:
       # Insert the 4th radial distortion coefficient if not present.
-      radial_distortion = jnp.pad(
+      radial_distortion = xnp.pad(
           asarray(radial_distortion),
           pad_width=(0, 4 - radial_distortion.shape[-1]),
       )
@@ -163,11 +170,17 @@ class Camera:
         radial_distortion is not None or tangential_distortion is not None
     ):
       kwargs['use_inverted_distortion'] = True
+      if xnp is not jnp:
+        raise ValueError(
+            'Inverted distortion is only supported with the JAX backend (jnp).'
+        )
 
     if is_fisheye:
       kwargs['projection_type'] = ProjectionType.FISHEYE
     else:
       kwargs['projection_type'] = ProjectionType.PERSPECTIVE
+
+    kwargs['xnp'] = xnp
 
     return cls(**kwargs)
 
@@ -188,7 +201,7 @@ class Camera:
     """
     fields = {f.name: f for f in self.pytree_fields()}
     field_is_batched = {
-        k: len(jnp.array(v).shape) > len(fields[k].metadata['unbatched_shape'])
+        k: self.xnp.array(v).ndim > len(fields[k].metadata['unbatched_shape'])
         for k, v in self.pytree_dict().items()
     }
     if not any(field_is_batched.values()):
@@ -256,7 +269,7 @@ class Camera:
       raise TypeError('len() of unbatched camera')
     return self.shape[0]
 
-  def __getitem__(self, index: npt.ArrayLike) -> 'Camera':
+  def __getitem__(self, index: ArrayLike) -> 'Camera':
     """Convenience method for slicing the camera.
 
     Slices the camera. Any slicing object that works with numpy arrays will
@@ -346,31 +359,31 @@ class Camera:
       yield self[i]
 
   @property
-  def scale_factor_x(self) -> npt.ArrayLike:
+  def scale_factor_x(self) -> ArrayLike:
     return self.focal_length  # pytype: disable=bad-return-type  # jax-ndarray
 
   @property
-  def scale_factor_y(self) -> npt.ArrayLike:
+  def scale_factor_y(self) -> ArrayLike:
     return self.focal_length * self.pixel_aspect_ratio  # pytype: disable=bad-return-type  # jax-ndarray
 
   @property
-  def principal_point_x(self) -> npt.ArrayLike:
+  def principal_point_x(self) -> ArrayLike:
     return self.principal_point[..., 0]
 
   @property
-  def principal_point_y(self) -> npt.ArrayLike:
+  def principal_point_y(self) -> ArrayLike:
     return self.principal_point[..., 1]
 
   @property
-  def image_size_x(self) -> npt.ArrayLike:
+  def image_size_x(self) -> ArrayLike:
     return self.image_size[..., 0]
 
   @property
-  def image_size_y(self) -> npt.ArrayLike:
+  def image_size_y(self) -> ArrayLike:
     return self.image_size[..., 1]
 
   @property
-  def optical_axis(self) -> npt.ArrayLike:
+  def optical_axis(self) -> ArrayLike:
     return self.orientation[..., 2, :]
 
   @property
@@ -386,36 +399,46 @@ class Camera:
     return self.tangential_distortion is not None
 
   @property
-  def translation(self) -> npt.ArrayLike:
+  def translation(self) -> ArrayLike:
     # pylint: disable=invalid-unary-operand-type
     return math.matvecmul(-self.orientation, self.position)
 
   @property
-  def world_to_camera_matrix(self) -> npt.ArrayLike:
+  def world_to_camera_matrix(self) -> ArrayLike:
     """Returns the 4x4 matrix that takes world points to camera coordinates."""
-    matrix = jnp.empty((*self.shape, 3, 4))
-    matrix = matrix.at[..., :3, :3].set(self.orientation)
-    matrix = matrix.at[..., :3, 3].set(self.translation)
-    return _to_matrix_4x4(matrix)
+    matrix_3x4 = self.xnp.concatenate(
+        [self.orientation, self.translation[..., None]], axis=-1
+    )
+    return _to_matrix_4x4(matrix_3x4)
 
   @property
-  def camera_to_world_matrix(self) -> npt.ArrayLike:
+  def camera_to_world_matrix(self) -> ArrayLike:
     """Returns the 4x4 matrix that takes camera points to world coordinates."""
-    matrix = jnp.empty((*self.shape, 3, 4))
-    matrix = matrix.at[..., :3, :3].set(jnp.matrix_transpose(self.orientation))
-    matrix = matrix.at[..., :3, 3].set(self.position)
+    xnp = self.xnp
+    o = xnp.matrix_transpose(self.orientation)
+    p = xnp.broadcast_to(self.position[..., None], o.shape[:-1] + (1,))
+    matrix = xnp.concatenate([o, p], axis=-1)
     return _to_matrix_4x4(matrix)
 
   @property
-  def intrinsic_matrix(self) -> npt.ArrayLike:
+  def intrinsic_matrix(self) -> ArrayLike:
     """Returns the intrinsic matrix that maps local coordinates to pixels."""
-    matrix = jnp.zeros((*self.shape, 3, 3))
-    matrix = matrix.at[..., 0, 0].set(self.scale_factor_x)
-    matrix = matrix.at[..., 0, 1].set(self.skew)
-    matrix = matrix.at[..., 0, 2].set(self.principal_point_x)
-    matrix = matrix.at[..., 1, 1].set(self.scale_factor_y)
-    matrix = matrix.at[..., 1, 2].set(self.principal_point_y)
-    matrix = matrix.at[..., 2, 2].set(1)
+    xnp = self.xnp
+    zeros = xnp.zeros_like(self.scale_factor_x)
+    ones = xnp.ones_like(self.scale_factor_x)
+    matrix = xnp.stack(
+        [
+            xnp.stack(
+                [self.scale_factor_x, self.skew, self.principal_point_x],
+                axis=-1,
+            ),
+            xnp.stack(
+                [zeros, self.scale_factor_y, self.principal_point_y], axis=-1
+            ),
+            xnp.stack([zeros, zeros, ones], axis=-1),
+        ],
+        axis=-2,
+    )
     return matrix
 
 
@@ -428,23 +451,38 @@ def create(*args, **kwargs) -> Camera:
   return Camera.create(*args, **kwargs)
 
 
-def _to_matrix_4x4(matrix):
+def _to_matrix_4x4(matrix: ArrayLike):
   """Converts a matrix to a 4x4 matrix."""
   if matrix.shape[-2] > 4 or matrix.shape[-1] > 4:
     raise ValueError('Matrix dimensions must be a maximum of 4x4.')
 
-  num_rows, num_cols = matrix.shape[-2:]
-  matrix_4x4 = jnp.zeros((*matrix.shape[:-2], 4, 4))
-  matrix_4x4 = matrix_4x4.at[..., 3, 3].set(1)
-  matrix_4x4 = matrix_4x4.at[..., :num_rows, :num_cols].set(matrix)
+  xnp = matrix.__array_namespace__()
+  shape, (n, m) = matrix.shape[:-2], matrix.shape[-2:]
+  matrix_4x4 = xnp.concatenate(
+      [
+          xnp.concatenate(
+              [matrix, xnp.zeros(shape + (3, 4 - m))],
+              axis=-1,
+          ),
+          xnp.concatenate(
+              [xnp.zeros(shape + (4 - n, 3)), xnp.ones(shape + (1, 1))],
+              axis=-1,
+          ),
+      ],
+      axis=-2,
+  )
   return matrix_4x4
 
 
 def _distort_local_pixels(
-    camera: Camera, x: npt.ArrayLike, y: npt.ArrayLike
-) -> tuple[npt.ArrayLike, npt.ArrayLike]:
+    camera: Camera, x: ArrayLike, y: ArrayLike
+) -> tuple[ArrayLike, ArrayLike]:
   """Distorts normalized image pixels."""
   if camera.use_inverted_distortion:
+    if camera.xnp is not jnp:
+      raise ValueError(
+          'Inverted distortion requires the JAX numpy backend (jnp).'
+      )
     x, y = _radial_and_tangential_undistort(
         x,
         y,
@@ -463,8 +501,8 @@ def _distort_local_pixels(
 
 
 def _undistort_local_pixels(
-    camera: Camera, x: npt.ArrayLike, y: npt.ArrayLike
-) -> tuple[npt.ArrayLike, npt.ArrayLike]:
+    camera: Camera, x: ArrayLike, y: ArrayLike
+) -> tuple[ArrayLike, ArrayLike]:
   """Undistorts normalized image pixels."""
   if camera.use_inverted_distortion:
     x, y = _radial_and_tangential_distort(
@@ -474,6 +512,10 @@ def _undistort_local_pixels(
         tangential_distortion=camera.tangential_distortion,
     )
   elif camera.has_distortion:
+    if camera.xnp is not jnp:
+      raise ValueError(
+          'Inverted distortion requires the JAX numpy backend (jnp).'
+      )
     x, y = _radial_and_tangential_undistort(
         x,
         y,
@@ -485,9 +527,10 @@ def _undistort_local_pixels(
 
 
 def pixels_to_local_rays(
-    camera: Camera, pixels: npt.ArrayLike, normalize: bool = True
-) -> npt.ArrayLike:
+    camera: Camera, pixels: ArrayLike, normalize: bool = True
+) -> ArrayLike:
   """Returns local ray directions for the provided pixels."""
+  xnp = camera.xnp
   y = (pixels[..., 1] - camera.principal_point_y) / camera.scale_factor_y
   x = (
       pixels[..., 0] - camera.principal_point_x - y * camera.skew
@@ -495,37 +538,37 @@ def pixels_to_local_rays(
 
   x, y = _undistort_local_pixels(camera, x, y)
 
-  dirs = jnp.stack([x, y, jnp.ones_like(x)], axis=-1)
+  dirs = xnp.stack([x, y, xnp.ones_like(x)], axis=-1)
   if camera.projection_type is ProjectionType.FISHEYE:
-    theta = jnp.sqrt(x**2 + y**2)
-    theta = jnp.minimum(jnp.pi, theta)
-    sin_theta_over_theta = jnp.sin(theta) / theta
-    fisheye_dir = jnp.stack(
+    theta = xnp.sqrt(x**2 + y**2)
+    theta = xnp.minimum(xnp.pi, theta)
+    sin_theta_over_theta = xnp.sin(theta) / theta
+    fisheye_dir = xnp.stack(
         [
             dirs[..., 0] * sin_theta_over_theta,
             dirs[..., 1] * sin_theta_over_theta,
-            jnp.cos(theta),
+            xnp.cos(theta),
         ],
         axis=-1,
     )
-    eps = jnp.finfo(x.dtype).eps
+    eps = xnp.finfo(x.dtype).eps
     # It is approximately perspective when the viewing ray is too close to the
     # optical axis.
     if normalize:
-      dirs = dirs / jnp.linalg.norm(dirs, axis=-1, keepdims=True)
-    dirs = jnp.where(theta[..., None] < eps, dirs, fisheye_dir)
+      dirs = dirs / xnp.linalg.norm(dirs, axis=-1, keepdims=True)
+    dirs = xnp.where(theta[..., None] < eps, dirs, fisheye_dir)
   else:
     if normalize:
-      dirs = dirs / jnp.linalg.norm(dirs, axis=-1, keepdims=True)
+      dirs = dirs / xnp.linalg.norm(dirs, axis=-1, keepdims=True)
 
   return dirs
 
 
 def pixels_to_rays(
     camera: Camera,
-    pixels: npt.ArrayLike,
+    pixels: ArrayLike,
     normalize: bool = True,
-) -> npt.ArrayLike:
+) -> ArrayLike:
   """Returns world-space rays for the provided pixels.
 
   Args:
@@ -540,30 +583,32 @@ def pixels_to_rays(
   """
   if pixels.shape[-1] != 2:
     raise ValueError('The last dimension of pixels must be 2.')
+  xnp = camera.xnp
 
   local_rays_dir = pixels_to_local_rays(camera, pixels, normalize=normalize)
   return math.matvecmul(
-      jnp.matrix_transpose(camera.orientation),
+      xnp.matrix_transpose(camera.orientation),
       local_rays_dir,
   )
 
 
 def pixels_to_points(
-    camera: Camera, pixels: npt.ArrayLike, depth: npt.ArrayLike
-) -> npt.ArrayLike:
+    camera: Camera, pixels: ArrayLike, depth: ArrayLike
+) -> ArrayLike:
   """Unprojects pixels and depth to (x,y,z,w) homogenous world-space points."""
   rays_through_pixels = pixels_to_rays(camera, pixels)
   ray_depth = depth_to_ray_depth(camera, rays_through_pixels, depth)
   points = rays_through_pixels * ray_depth[..., None] + camera.position
+  xnp = camera.xnp
   pad_shape = [(0, 0)] * len(depth.shape) + [(0, 1)]
-  points = jnp.pad(points, pad_shape, constant_values=1.0)
+  points = xnp.pad(points, pad_shape, constant_values=1.0)
   return points
 
 
 def world_points_to_local_points(
     camera: Camera,
-    world_points: npt.ArrayLike,
-) -> npt.ArrayLike:
+    world_points: ArrayLike,
+) -> ArrayLike:
   """Transforms world-space (x,y,z) points to local-space (x,y,z) points.
 
   Local-space coordinates are also known as camera-space coordinates.
@@ -581,8 +626,8 @@ def world_points_to_local_points(
 
 def local_points_to_world_points(
     camera: Camera,
-    local_points: npt.ArrayLike,
-) -> npt.ArrayLike:
+    local_points: ArrayLike,
+) -> ArrayLike:
   """Transforms local-space (x,y,z) points to world-space (x,y,z) points.
 
   Local-space coordinates are also known as camera-space coordinates.
@@ -594,8 +639,9 @@ def local_points_to_world_points(
   Returns:
     The world-space coordinates.
   """
+  xnp = camera.xnp
   rotated_points = math.matvecmul(
-      jnp.matrix_transpose(camera.orientation),
+      xnp.matrix_transpose(camera.orientation),
       local_points,
   )
   return rotated_points + camera.position
@@ -603,9 +649,9 @@ def local_points_to_world_points(
 
 def depth_to_ray_depth(
     camera: Camera,
-    ray: npt.ArrayLike,
-    depth: npt.ArrayLike,
-) -> npt.ArrayLike:
+    ray: ArrayLike,
+    depth: ArrayLike,
+) -> ArrayLike:
   """Converts depth along the optical axis to depth along ray.
 
   Args:
@@ -622,9 +668,9 @@ def depth_to_ray_depth(
 
 def ray_depth_to_depth(
     camera: Camera,
-    ray: npt.ArrayLike,
-    ray_depth: npt.ArrayLike,
-) -> npt.ArrayLike:
+    ray: ArrayLike,
+    ray_depth: ArrayLike,
+) -> ArrayLike:
   """Converts depth along ray to depth along the optical axis.
 
   Args:
@@ -639,7 +685,7 @@ def ray_depth_to_depth(
   return ray_depth * cosa
 
 
-def world_to_camera_matrix(camera: Camera) -> npt.ArrayLike:
+def world_to_camera_matrix(camera: Camera) -> ArrayLike:
   """Returns the 4x4 matrix that takes world points to camera coordinates.
 
   DEPRECATED: Use Camera.world_to_camera_matrix.
@@ -653,9 +699,7 @@ def world_to_camera_matrix(camera: Camera) -> npt.ArrayLike:
   return camera.world_to_camera_matrix
 
 
-def update_world_to_camera_matrix(
-    camera: Camera, matrix: npt.ArrayLike
-) -> Camera:
+def update_world_to_camera_matrix(camera: Camera, matrix: ArrayLike) -> Camera:
   """Sets the transform that takes world points to camera coordinates.
 
   Args:
@@ -676,7 +720,7 @@ def update_world_to_camera_matrix(
   return camera.replace(position=position, orientation=orientation)
 
 
-def update_translation(camera: Camera, translation: npt.ArrayLike) -> Camera:
+def update_translation(camera: Camera, translation: ArrayLike) -> Camera:
   """Updates the translation of the camera.
 
   Args:
@@ -693,7 +737,7 @@ def update_translation(camera: Camera, translation: npt.ArrayLike) -> Camera:
 
 
 def update_intrinsic_matrix(
-    camera: Camera, intrinsic_matrix: npt.ArrayLike
+    camera: Camera, intrinsic_matrix: ArrayLike
 ) -> Camera:
   """Sets the camera intrinsics based on an intrinsic matrix.
 
@@ -709,6 +753,7 @@ def update_intrinsic_matrix(
         'Last two axes of intrinsic_matrix must have shape (3, 3).'
     )
 
+  xnp = camera.xnp
   focal_length_x = intrinsic_matrix[..., 0, 0]
   focal_length_y = intrinsic_matrix[..., 1, 1]
   pixel_aspect_ratio = focal_length_y / focal_length_x
@@ -718,15 +763,31 @@ def update_intrinsic_matrix(
       focal_length=focal_length_x,
       pixel_aspect_ratio=pixel_aspect_ratio,
       skew=intrinsic_matrix[..., 0, 1],
-      principal_point=jnp.stack(
+      principal_point=xnp.stack(
           [principal_point_x, principal_point_y], axis=-1
       ),
   )
 
 
+def replace_backend(camera: Camera, xnp: Union[type(onp), type(jnp)]) -> Camera:
+  cast = lambda z: None if z is None else xnp.array(z)
+  return camera.replace(
+      orientation=cast(camera.orientation),
+      position=cast(camera.position),
+      focal_length=cast(camera.focal_length),
+      principal_point=cast(camera.principal_point),
+      image_size=cast(camera.image_size),
+      skew=cast(camera.skew),
+      pixel_aspect_ratio=cast(camera.pixel_aspect_ratio),
+      radial_distortion=cast(camera.radial_distortion),
+      tangential_distortion=cast(camera.tangential_distortion),
+      xnp=xnp,
+  )
+
+
 def invert_radial_distortion_coefficients(
-    radial_distortion: npt.ArrayLike,
-) -> npt.ArrayLike:
+    radial_distortion: ArrayLike,
+) -> ArrayLike:
   """Inverts radial distortion parameters.
 
   This uses the exact inverse formula from Drap and Lefèvre (Sensors, 2016).
@@ -740,20 +801,21 @@ def invert_radial_distortion_coefficients(
   Returns:
     The inverted radial distortion parameters.
   """
-  a1, a2, a3, a4 = jnp.split(radial_distortion, 4, axis=-1)
+  xnp = radial_distortion.__array_namespace__()
+  a1, a2, a3, a4 = xnp.split(radial_distortion, 4, axis=-1)
   b1 = -a1
   b2 = 3 * a1**2 - a2
   b3 = 8 * a1 * a2 - 12 * a1**3 - a3
   b4 = 55 * a1**4 + 10 * a1 * a3 - 55 * a1**2 * a2 + 5 * a2**2 - a4
-  return jnp.concatenate([b1, b2, b3, b4], axis=-1)
+  return xnp.concatenate([b1, b2, b3, b4], axis=-1)
 
 
 def _radial_and_tangential_distort(
-    x: npt.ArrayLike,
-    y: npt.ArrayLike,
-    radial_distortion: Optional[npt.ArrayLike] = None,
-    tangential_distortion: Optional[npt.ArrayLike] = None,
-) -> tuple[npt.ArrayLike, npt.ArrayLike]:
+    x: ArrayLike,
+    y: ArrayLike,
+    radial_distortion: Optional[ArrayLike] = None,
+    tangential_distortion: Optional[ArrayLike] = None,
+) -> tuple[ArrayLike, ArrayLike]:
   """Computes the distorted pixel positions."""
   dx_radial, dy_radial = 0.0, 0.0
   dx_tangential, dy_tangential = 0.0, 0.0
@@ -774,12 +836,12 @@ def _radial_and_tangential_distort(
 
 
 def _radial_and_tangential_undistort(
-    x_distorted: npt.ArrayLike,
-    y_distorted: npt.ArrayLike,
-    radial_distortion: npt.ArrayLike,
-    tangential_distortion: npt.ArrayLike,
+    x_distorted: ArrayLike,
+    y_distorted: ArrayLike,
+    radial_distortion: ArrayLike,
+    tangential_distortion: ArrayLike,
     max_iterations: int = 3,
-) -> tuple[npt.ArrayLike, npt.ArrayLike]:
+) -> tuple[ArrayLike, ArrayLike]:
   """Undistorts a point in image-space using an iterative optimization.
 
   This uses Newton-Raphson (related to Gauss-Newton) to find the undistorted
@@ -828,8 +890,7 @@ def _radial_and_tangential_undistort(
   return xy[..., 0], xy[..., 1]
 
 
-@jax.jit
-def project(camera: Camera, points: npt.ArrayLike) -> npt.ArrayLike:
+def project(camera: Camera, points: ArrayLike) -> ArrayLike:
   """Projects world-space 3D points (x,y,z) to pixel positions (x,y).
 
   Args:
@@ -839,7 +900,8 @@ def project(camera: Camera, points: npt.ArrayLike) -> npt.ArrayLike:
   Returns:
     A (..., 2) array containing the projected pixel locations.
   """
-  eps = jnp.finfo(points.dtype).eps
+  xnp = camera.xnp
+  eps = xnp.finfo(points.dtype).eps
   batch_shape = points.shape[:-1]
   local_points = world_points_to_local_points(camera, points)
 
@@ -851,13 +913,13 @@ def project(camera: Camera, points: npt.ArrayLike) -> npt.ArrayLike:
   x = local_x / local_z
   y = local_y / local_z
   if camera.projection_type is ProjectionType.FISHEYE:
-    r = jnp.sqrt(local_x**2 + local_y**2)
-    theta = jnp.arctan2(r, local_z)
+    r = xnp.sqrt(local_x**2 + local_y**2)
+    theta = xnp.arctan2(r, local_z)
     fisheye_x = theta / r * local_x
     fisheye_y = theta / r * local_y
     # When theta is small it is approximately the same as perspective.
-    x = jnp.where(theta < eps, x, fisheye_x)
-    y = jnp.where(theta < eps, y, fisheye_y)
+    x = xnp.where(theta < eps, x, fisheye_x)
+    y = xnp.where(theta < eps, y, fisheye_y)
 
   x, y = _distort_local_pixels(camera, x, y)
 
@@ -868,15 +930,15 @@ def project(camera: Camera, points: npt.ArrayLike) -> npt.ArrayLike:
       + camera.principal_point_y
   )
 
-  pixels = jnp.stack([pixel_x, pixel_y], axis=-1)
+  pixels = xnp.stack([pixel_x, pixel_y], axis=-1)
   return pixels.reshape((*batch_shape, 2))
 
 
 def look_at(
     camera: Camera,
-    eye: npt.ArrayLike,
-    center: npt.ArrayLike,
-    world_up: npt.ArrayLike,
+    eye: ArrayLike,
+    center: ArrayLike,
+    world_up: ArrayLike,
     camera_convention: str = 'opencv',
 ) -> Camera:
   """Applies a look-at transform to the given camera.
@@ -896,10 +958,11 @@ def look_at(
   Returns:
     A copy of the camera but with the look-at transform applied.
   """
-  # NOTE: The computation before conversion happens in OpenGL coordinates.
+  xnp = camera.xnp
+
   vector_degeneracy_cutoff = 1e-6
   forward = center - eye
-  forward_norm = jnp.linalg.norm(forward)
+  forward_norm = xnp.linalg.norm(forward)
 
   try:
     if forward_norm < vector_degeneracy_cutoff:
@@ -911,8 +974,8 @@ def look_at(
 
   forward = forward / forward_norm
 
-  to_side = jnp.cross(forward, world_up)
-  to_side_norm = jnp.linalg.norm(to_side)
+  to_side = xnp.cross(forward, world_up)
+  to_side_norm = xnp.linalg.norm(to_side)
   try:
     if to_side_norm < vector_degeneracy_cutoff:
       raise ValueError(
@@ -923,15 +986,24 @@ def look_at(
     pass
 
   to_side = to_side / to_side_norm
-  cam_up = jnp.cross(to_side, forward)
+  cam_up = xnp.cross(to_side, forward)
 
-  # Make a 3x3 rotation matrix:
-  view_rotation = jnp.vstack([to_side, cam_up, -forward])
-  # Set the upper 3x3 of a 4x4 identity matrix:
-  view_rotation = jnp.eye(4).at[:3, :3].set(view_rotation)
+  view_rotation = xnp.vstack([
+      xnp.hstack([
+          xnp.vstack([
+              to_side,
+              cam_up,
+              -forward,
+          ]),
+          xnp.zeros((3, 1)),
+      ]),
+      xnp.array([[0, 0, 0, 1]]),
+  ])
 
-  # Make a 4x4 translation matrix:
-  view_translation = jnp.eye(4).at[:3, 3].set(-eye)
+  view_translation = xnp.vstack([
+      xnp.hstack([xnp.eye(3), -eye[:, None]]),
+      xnp.array([[0, 0, 0, 1]]),
+  ])
 
   # TODO(charatan): This is an incorrect use of math.matmul (since it's a
   # matrix-vector product), but the rest of the function isn't written to
@@ -939,31 +1011,36 @@ def look_at(
   cam_from_world = math.matmul(view_rotation, view_translation)
 
   if camera_convention == 'opencv':
-    # Equal to left multiplication by np.diag([1.0, -1.0, -1.0, 1.0])
-    cam_from_world = cam_from_world.at[1:3, :].multiply(-1.0)
+    cam_from_world *= xnp.array([
+        [1, 1, 1, 1],
+        [-1, -1, -1, -1],
+        [-1, -1, -1, -1],
+        [1, 1, 1, 1],
+    ])
   elif camera_convention != 'opengl':
     raise ValueError(f'Unknown camera convention {camera_convention}')
 
   return update_world_to_camera_matrix(camera, cam_from_world)
 
 
-def get_pixel_centers(image_width: int, image_height: int) -> npt.ArrayLike:
+def get_pixel_centers(image_width: int, image_height: int) -> ArrayLike:
   """Returns the pixel centers."""
-  xx, yy = jnp.meshgrid(
-      jnp.arange(image_width, dtype=jnp.float32),
-      jnp.arange(image_height, dtype=jnp.float32),
+  xx, yy = onp.meshgrid(
+      onp.arange(image_width, dtype=onp.float32),
+      onp.arange(image_height, dtype=onp.float32),
   )
-  return jnp.stack([xx, yy], axis=-1) + 0.5
+  return onp.stack([xx, yy], axis=-1) + 0.5
 
 
-def scale(camera: Camera, amount: float | jnp.ndarray) -> Camera:
+def scale(camera: Camera, amount: float | ArrayLike) -> Camera:
   """Scales the camera by the given amount."""
   # First round the image size to a round number.
-  new_image_size = jnp.round(camera.image_size * amount)
+  xnp = camera.xnp
+  new_image_size = xnp.round(camera.image_size * amount)
   return scale_to_image_size(camera, new_image_size)
 
 
-def scale_to_image_size(camera: Camera, image_size: npt.ArrayLike) -> Camera:
+def scale_to_image_size(camera: Camera, image_size: ArrayLike) -> Camera:
   """Scales the camera to the given image size."""
   scale_xy = image_size / camera.image_size
   scale_x = scale_xy[..., 0]
@@ -979,10 +1056,10 @@ def scale_to_image_size(camera: Camera, image_size: npt.ArrayLike) -> Camera:
 
 def crop(
     camera: Camera,
-    left: int | jnp.ndarray = 0,
-    right: int | jnp.ndarray = 0,
-    top: int | jnp.ndarray = 0,
-    bottom: int | jnp.ndarray = 0,
+    left: Union[int, ArrayLike] = 0,
+    right: Union[int, ArrayLike] = 0,
+    top: Union[int, ArrayLike] = 0,
+    bottom: Union[int, ArrayLike] = 0,
 ) -> Camera:
   """Returns a copy of the camera with adjusted image bounds.
 
@@ -1000,8 +1077,8 @@ def crop(
     A camera with adjusted image dimensions. The focal length is unchanged, and
     the principal point is updated to preserve the original principal axis.
   """
-  crop_left_top = jnp.array([left, top])
-  crop_right_bottom = jnp.array([right, bottom])
+  crop_left_top = onp.array([left, top])
+  crop_right_bottom = onp.array([right, bottom])
   new_image_size = camera.image_size - crop_left_top - crop_right_bottom
   new_principal_point = camera.principal_point - crop_left_top
 
@@ -1033,6 +1110,7 @@ def concatenate(cameras: Sequence[Camera], axis: int = 0) -> Camera:
   Returns:
     The concatenated camera.
   """
+  xnp = cameras[0].xnp
 
   if not cameras:
     raise ValueError('Need at least one camera to concatenate.')
@@ -1046,12 +1124,7 @@ def concatenate(cameras: Sequence[Camera], axis: int = 0) -> Camera:
 
   # Expand unbatched cameras.
   cameras = [
-      (
-          c
-          if c.shape
-          else jax.tree.map(functools.partial(jnp.expand_dims, axis=0), c)
-      )
-      for c in cameras
+      (c if c.shape else jax.tree.map(lambda z: z[None], c)) for c in cameras
   ]
 
   cls = cameras[0].__class__
@@ -1068,23 +1141,23 @@ def concatenate(cameras: Sequence[Camera], axis: int = 0) -> Camera:
 
     def _expand_and_broadcast(c):
       # pylint: disable=cell-var-from-loop
-      v = jnp.asarray(getattr(c, field.name))
+      v = xnp.asarray(getattr(c, field.name))
       ndim = v.ndim - len(unbatched_shape)
-      v = jnp.expand_dims(v, axis=tuple(range(len(c.shape) - ndim)))
-      v = jnp.broadcast_to(v, shape=(*c.shape, *unbatched_shape))
+      v = xnp.expand_dims(v, axis=tuple(range(len(c.shape) - ndim)))
+      v = xnp.broadcast_to(v, shape=(*c.shape, *unbatched_shape))
       return v
 
     values = [_expand_and_broadcast(c) for c in cameras]
-    kwargs[field.name] = jnp.concatenate(values, axis=axis)
+    kwargs[field.name] = xnp.concatenate(values, axis=axis)
 
   return cls(**kwargs)
 
 
 def transform(
     camera: Camera,
-    scale: npt.ArrayLike,  # pylint: disable=redefined-outer-name
-    rotation: npt.ArrayLike,
-    translation: npt.ArrayLike,
+    scale: ArrayLike,  # pylint: disable=redefined-outer-name
+    rotation: ArrayLike,
+    translation: ArrayLike,
 ) -> Camera:
   """Applies a similarity transform to the camera.
 
@@ -1104,9 +1177,10 @@ def transform(
   Returns:
     The transformed camera.
   """
+  xnp = camera.xnp
   new_orientation = math.matmul(
       camera.orientation,
-      jnp.matrix_transpose(rotation),
+      xnp.matrix_transpose(rotation),
   )
   new_position = math.transform_point(
       camera.position, scale=scale, rotation=rotation, translation=translation
@@ -1114,7 +1188,7 @@ def transform(
   return camera.replace(orientation=new_orientation, position=new_position)
 
 
-def relative_transform(reference: Camera, target: Camera) -> npt.ArrayLike:
+def relative_transform(reference: Camera, target: Camera) -> ArrayLike:
   """Computes the transform from reference camera to the target camera.
 
   The transform relativizes the camera such that the target cameras are in the
@@ -1135,7 +1209,7 @@ def relative_transform(reference: Camera, target: Camera) -> npt.ArrayLike:
   )
 
 
-def essential_matrix(reference: Camera, target: Camera) -> npt.ArrayLike:
+def essential_matrix(reference: Camera, target: Camera) -> ArrayLike:
   """Computes the essential matrix between two cameras.
 
   The essential matrix will be computed based on the transformation from the
@@ -1156,7 +1230,7 @@ def essential_matrix(reference: Camera, target: Camera) -> npt.ArrayLike:
   return math.matmul(math.skew(rel_target.translation), rel_target.orientation)
 
 
-def fundamental_matrix(reference: Camera, target: Camera) -> npt.ArrayLike:
+def fundamental_matrix(reference: Camera, target: Camera) -> ArrayLike:
   """Computes the fundamental matrix between two cameras.
 
   References:
@@ -1172,7 +1246,8 @@ def fundamental_matrix(reference: Camera, target: Camera) -> npt.ArrayLike:
     results in a homogeneous line equation containing the corresponding epipolar
     line in the target camera.
   """
+  xnp = reference.xnp
   essential_mat = essential_matrix(reference, target)
-  left = jnp.matrix_transpose(jnp.linalg.inv(target.intrinsic_matrix))
-  right = jnp.linalg.inv(reference.intrinsic_matrix)
+  left = xnp.matrix_transpose(xnp.linalg.inv(target.intrinsic_matrix))
+  right = xnp.linalg.inv(reference.intrinsic_matrix)
   return math.matmul(left, math.matmul(essential_mat, right))
