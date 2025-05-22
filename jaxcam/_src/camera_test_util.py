@@ -14,6 +14,8 @@
 
 """Unit tests for jaxcam."""
 
+import pickle
+
 from absl.testing import parameterized
 from jax import random
 import jaxcam
@@ -411,6 +413,17 @@ def create_camera_test_class(xnp, xnp_name: str):
       camera2 = camera1.reshape(shape2)
       self.assertEqual(camera2.shape, shape2)
       self.assertEqual(camera2.orientation.shape, shape2 + (3, 3))
+
+    def test_pickle_unpickle(self):
+      """Tests that pickling and unpickling works correctly."""
+      camera = jaxcam.Camera.create(
+          xnp=xnp,
+          orientation=xnp.asarray(_SAMPLE_ROTATION),
+          position=xnp.array([0.5, 1.5, 2.5]),
+      )
+      pickled_camera = pickle.dumps(camera)
+      unpickled_camera = pickle.loads(pickled_camera)
+      self.assertEqual(unpickled_camera.xnp, xnp)
 
   CameraTestBase.__name__ = f'CameraTest_{xnp_name}'
   return CameraTestBase

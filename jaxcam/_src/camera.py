@@ -358,6 +358,42 @@ class Camera:
     for i in range(len(self)):
       yield self[i]
 
+  def _get_xnp_module_name(self):
+    if self.xnp == jnp:
+      return 'jax.numpy'
+    elif self.xnp == onp:
+      return 'numpy'
+    return 'unknown'
+
+  def __getstate__(self):
+    """Prepare the state for pickling by removing the 'xnp' module reference."""
+    # Make a copy of the object's dictionary
+    state = {key: value for key, value in self.__dict__.items() if key != 'xnp'}
+
+    # Determine which numpy variant is active and store a flag
+    if self.xnp is jnp:
+      state['_xnp_restore_type_'] = 'jnp'
+    elif self.xnp is onp:
+      state['_xnp_restore_type_'] = 'onp'
+    else:
+      raise ValueError(f'Unknown numpy module: {state["xnp"]} found.')
+
+    return state
+
+  def __setstate__(self, state):
+    """Restore the state after unpickling."""
+    restore_type = state.pop('_xnp_restore_type_', 'jnp')
+
+    if restore_type == 'jnp':
+      object.__setattr__(self, 'xnp', jnp)
+    elif restore_type == 'onp':
+      object.__setattr__(self, 'xnp', onp)
+    else:
+      raise ValueError(f'Unknown numpy module: {restore_type} found.')
+
+    for key, value in state.items():
+      object.__setattr__(self, key, value)
+
   @property
   def scale_factor_x(self) -> ArrayLike:
     return self.focal_length  # pytype: disable=bad-return-type  # jax-ndarray
