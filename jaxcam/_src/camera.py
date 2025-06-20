@@ -1,4 +1,4 @@
-# Copyright 2024 The jaxcam Authors.
+# Copyright 2025 The jaxcam Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 """A JAX-based camera class."""
 
 from collections.abc import Sequence
+import contextlib
 import dataclasses
 import enum
 import functools
@@ -28,6 +29,33 @@ from jaxcam._src import math
 import numpy as onp
 
 ArrayLike = onp.typing.ArrayLike
+
+# By default, for fisheye cameras, points near the camera position will have
+# NaN values, and for perspective cameras, points on the zero-depth plane will
+# have NaN values. Setting `SILENCE_NANS=True` will ensure that NaNs are
+# replaced with zeros.
+_SILENCE_NANS = False
+
+
+@contextlib.contextmanager
+def silence_nans(value: bool, *unused_args, **unused_kwargs):
+  """Context manager for setting whether to silence NaNs in the camera class."""
+  global _SILENCE_NANS
+  old_value = _SILENCE_NANS
+  _SILENCE_NANS = value
+  yield
+  _SILENCE_NANS = old_value
+
+
+def set_silence_nans(value: bool):
+  """Toggles whether to silence NaNs in the camera class."""
+  global _SILENCE_NANS
+  _SILENCE_NANS = value
+
+
+def get_silence_nans():
+  """Get the current value of whether to silence NaNs in the camera class."""
+  return _SILENCE_NANS
 
 
 def _camera_field(unbatched_shape: tuple[int, ...], **kwargs) -> ...:
@@ -946,10 +974,22 @@ def project(camera: Camera, points: ArrayLike) -> ArrayLike:
   local_z = local_points[..., 2]
 
   # Get normalized local pixel positions.
-  x = local_x / local_z
-  y = local_y / local_z
+  if _SILENCE_NANS:
+    denominator = xnp.reciprocal(
+        xnp.where(xnp.abs(local_z) < eps, eps, local_z)
+    )
+    x = local_x * denominator
+    y = local_y * denominator
+  else:
+    x = local_x / local_z
+    y = local_y / local_z
+
   if camera.projection_type is ProjectionType.FISHEYE:
-    r = xnp.sqrt(local_x**2 + local_y**2)
+    magnitude_sq = local_x**2 + local_y**2
+    if _SILENCE_NANS:
+      r = xnp.sqrt(xnp.where(magnitude_sq < eps, eps ** 2, magnitude_sq))
+    else:
+      r = xnp.sqrt(magnitude_sq)
     theta = xnp.arctan2(r, local_z)
     fisheye_x = theta / r * local_x
     fisheye_y = theta / r * local_y

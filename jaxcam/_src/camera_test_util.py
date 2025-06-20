@@ -1,4 +1,4 @@
-# Copyright 2024 The jaxcam Authors.
+# Copyright 2025 The jaxcam Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,9 @@
 import pickle
 
 from absl.testing import parameterized
+import jax
 from jax import random
+import jax.numpy as jnp
 import jaxcam
 from jaxcam._src import math
 import numpy as onp
@@ -424,6 +426,104 @@ def create_camera_test_class(xnp, xnp_name: str):
       pickled_camera = pickle.dumps(camera)
       unpickled_camera = pickle.loads(pickled_camera)
       self.assertEqual(unpickled_camera.xnp, xnp)
+
+    @parameterized.product(
+        depth_values=[
+            xnp.finfo(xnp.float32).smallest_normal * 0.1,
+            -xnp.finfo(xnp.float32).smallest_normal * 0.1,
+        ],
+        orientation=[
+            onp.array([
+                [1.0, 0.0, 0.0],
+                [0.0, -0.41614687, -0.9092974],
+                [0.0, 0.9092974, -0.41614687],
+            ]),
+            onp.array([
+                [0.7071067, 0.0, 0.7071068],
+                [0.0, 1.0, 0.0],
+                [-0.7071068, 0.0, 0.7071067],
+            ]),
+            onp.array([
+                [0.7071067, -0.7071068, 0.0],
+                [0.7071068, 0.7071067, 0.0],
+                [0.0, 0.0, 1.0],
+            ]),
+            onp.array(
+                [
+                    [0.22629565, -0.18300793, 0.95671225],
+                    [0.95671225, 0.22629565, -0.18300793],
+                    [-0.18300793, 0.95671225, 0.22629565],
+                ],
+            ),
+        ],
+        position=[
+            onp.zeros(3),
+            onp.ones(3),
+            onp.array([0.1, 0.0, -0.1]),
+        ],
+        is_fisheye=[
+            False,
+            True,
+        ],
+    )
+    def test_camera_project_does_not_return_nans(
+        self, depth_values, orientation, position, is_fisheye
+    ):
+      """Tests that the camera project function does not return NaNs."""
+      # Enable NaNs silencing.
+      with jaxcam.silence_nans(True):
+        camera = jaxcam.Camera.create(
+            xnp=xnp,
+            orientation=xnp.array(orientation),
+            position=xnp.array(position),
+            is_fisheye=is_fisheye,
+        )
+
+        points = xnp.asarray(
+            [
+                [0.0, 0.0, depth_values],
+                [1.0, 0.0, depth_values],
+                [0.0, 1.0, depth_values],
+                [1.0, 1.0, depth_values],
+            ],
+            dtype=xnp.float32,
+        )
+
+        projections = jaxcam.project(camera, points)
+        self.assertFalse(xnp.isnan(projections).any())
+
+        if xnp is jnp:
+
+          def loss(points, camera):
+            projections = jaxcam.project(camera, points)
+            return jnp.sum(jnp.square(projections))
+
+          grad_func = jax.value_and_grad(
+              loss,
+              argnums=(0, 1),
+          )
+
+          loss_value, grads = grad_func(points, camera)
+          self.assertFalse(jnp.isnan(loss_value).any())
+
+          flat_grads = jax.tree.leaves(grads)
+
+          has_nan_grads = any(
+              jax.tree.map(
+                  lambda x: jnp.any(x).item(),
+                  jax.tree.map(jnp.isnan, flat_grads),
+              )
+          )
+          self.assertFalse(has_nan_grads)
+
+    @parameterized.product(
+        value=[True, False],
+    )
+    def test_silence_nans_context_manager(self, value: bool):
+      """Tests that the silence_nans context manager works correctly."""
+      with jaxcam.silence_nans(value):
+        self.assertEqual(jaxcam.get_silence_nans(), value)
+      self.assertEqual(jaxcam.get_silence_nans(), False)
 
   CameraTestBase.__name__ = f'CameraTest_{xnp_name}'
   return CameraTestBase
