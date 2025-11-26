@@ -525,5 +525,63 @@ def create_camera_test_class(xnp, xnp_name: str):
         self.assertEqual(jaxcam.get_silence_nans(), value)
       self.assertEqual(jaxcam.get_silence_nans(), False)
 
+    @parameterized.product(
+        scale_factor=[0.5, 2.0],
+        principal_point_offset=[
+            onp.array([0.0, 0.0]),
+            onp.array([-16.0, 12.0]),
+        ],
+        radial_distortion=[
+            None,
+            onp.array([0.01, 0.001, 0.0001, 0.0]),
+            onp.array([0.4, 0.2, 0.1, 0.0]),
+        ],
+        tangential_distortion=[
+            None,
+            onp.array([0.001, 0.0001]),
+            onp.array([0.04, 0.02]),
+        ],
+        invert_distortion=[True, False],
+    )
+    def test_scale_camera(
+        self,
+        scale_factor,
+        principal_point_offset,
+        radial_distortion,
+        tangential_distortion,
+        invert_distortion,
+    ):
+      """Tests that scale() works with distortion."""
+      if (
+          radial_distortion is not None or tangential_distortion is not None
+      ) and xnp is onp:
+        self.skipTest('numpy backend does not support distortion.')
+
+      if radial_distortion is not None:
+        radial_distortion = xnp.array(radial_distortion)
+      if tangential_distortion is not None:
+        tangential_distortion = xnp.array(tangential_distortion)
+
+      width = 512
+      height = 256
+      camera = jaxcam.Camera.create(
+          xnp=xnp,
+          focal_length=xnp.array(512.0),
+          image_size=xnp.array([width, height]),
+          principal_point=xnp.array([width / 2, height / 2])
+          + xnp.array(principal_point_offset),
+          radial_distortion=radial_distortion,
+          tangential_distortion=tangential_distortion,
+          invert_distortion=invert_distortion,
+      )
+
+      scaled_camera = jaxcam.scale(camera, scale_factor)
+
+      pixels = jaxcam.get_pixel_centers(width, height)
+      rays = jaxcam.pixels_to_rays(camera, pixels)
+      scaled_pixels = pixels * scale_factor
+      scaled_rays = jaxcam.pixels_to_rays(scaled_camera, scaled_pixels)
+      onp.testing.assert_allclose(rays, scaled_rays, atol=1e-5)
+
   CameraTestBase.__name__ = f'CameraTest_{xnp_name}'
   return CameraTestBase
