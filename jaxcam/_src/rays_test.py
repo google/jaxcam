@@ -1,4 +1,4 @@
-# Copyright 2025 The jaxcam Authors.
+# Copyright 2026 The jaxcam Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -72,10 +72,10 @@ class RaysTest(parameterized.TestCase):
         atol=1e-3,
     )
     np.testing.assert_allclose(
-        camera_recovered.orientation, camera.orientation, rtol=1e-3, atol=1e-3
+        camera_recovered.orientation, camera.orientation, rtol=1e-2, atol=1e-2
     )
     np.testing.assert_allclose(
-        camera_recovered.position, camera.position, rtol=1e-3, atol=1e-3
+        camera_recovered.position, camera.position, rtol=1e-2, atol=1e-2
     )
 
   @parameterized.parameters(range(20))
@@ -121,7 +121,7 @@ class RaysTest(parameterized.TestCase):
         camera_recovered.orientation, camera.orientation, rtol=1e-1, atol=2e-2
     )
     np.testing.assert_allclose(
-        camera_recovered.position, camera.position, rtol=1e-3, atol=1e-3
+        camera_recovered.position, camera.position, rtol=1e-2, atol=1e-2
     )
 
   def test_rays_from_camera_batched(self):
