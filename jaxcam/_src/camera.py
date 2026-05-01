@@ -58,7 +58,7 @@ def get_silence_nans():
   return _SILENCE_NANS
 
 
-def _camera_field(unbatched_shape: tuple[int, ...], **kwargs) -> ...:
+def _camera_field(unbatched_shape: tuple[int, ...], **kwargs):
   return dataclasses.field(
       metadata={
           'pytree_node': True,
