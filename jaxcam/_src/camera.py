@@ -490,6 +490,7 @@ class Camera:
     xnp = self.xnp
     zeros = xnp.zeros_like(self.scale_factor_x)
     ones = xnp.ones_like(self.scale_factor_x)
+
     matrix = xnp.stack(
         [
             xnp.stack(
