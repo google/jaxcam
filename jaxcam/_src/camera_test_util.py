@@ -169,7 +169,7 @@ def create_camera_test_class(xnp, xnp_name: str):
           transformed_camera, transformed_points
       )
 
-      onp.testing.assert_allclose(
+      onp.testing.assert_allclose(  # pyrefly: ignore[no-matching-overload]
           projected_points, transformed_projected_points, atol=1e-3
       )
 
@@ -197,7 +197,7 @@ def create_camera_test_class(xnp, xnp_name: str):
       )
       actual = jaxcam.world_points_to_local_points(camera, sample_points)
 
-      onp.testing.assert_allclose(expected, actual, atol=1e-6)
+      onp.testing.assert_allclose(expected, actual, atol=1e-6)  # pyrefly: ignore[no-matching-overload]
 
     def test_local_points_to_world_points_regression(self):
       """Tests that local_points_to_world_points matches the old impl."""
@@ -223,7 +223,7 @@ def create_camera_test_class(xnp, xnp_name: str):
       )
       actual = jaxcam.local_points_to_world_points(camera, sample_points)
 
-      onp.testing.assert_allclose(expected, actual, atol=1e-6)
+      onp.testing.assert_allclose(expected, actual, atol=1e-6)  # pyrefly: ignore[no-matching-overload]
 
     def test_depth_to_ray_depth_regression(self):
       """Tests that depth_to_ray_depth matches the old implementation."""
@@ -240,7 +240,7 @@ def create_camera_test_class(xnp, xnp_name: str):
 
       rays = onp.array([[1.0, 2.0, 3.0], [2.0, 3.0, 4.0]])
       depths = onp.array([1.0, 1.0])
-      onp.testing.assert_allclose(
+      onp.testing.assert_allclose(  # pyrefly: ignore[no-matching-overload]
           jaxcam.depth_to_ray_depth(camera, rays, depths),
           depth_to_ray_depth_old(camera, rays, depths),
       )
@@ -260,7 +260,7 @@ def create_camera_test_class(xnp, xnp_name: str):
 
       rays = onp.array([[1.0, 2.0, 3.0], [2.0, 3.0, 4.0]])
       depths = onp.array([1.0, 1.0])
-      onp.testing.assert_allclose(
+      onp.testing.assert_allclose(  # pyrefly: ignore[no-matching-overload]
           jaxcam.ray_depth_to_depth(camera, rays, depths),
           ray_depth_to_depth_old(camera, rays, depths),
       )
@@ -297,13 +297,13 @@ def create_camera_test_class(xnp, xnp_name: str):
         )
         rays_dir = math.matmul(
             onp.swapaxes(camera.orientation, -1, -2),
-            local_rays_dir[..., onp.newaxis],
+            local_rays_dir[..., onp.newaxis],  # pyrefly: ignore[bad-index]
         )
         rays_dir = onp.squeeze(rays_dir, axis=-1)
         rays_dir = rays_dir.reshape((*batch_shape, 3))
         return rays_dir
 
-      onp.testing.assert_allclose(
+      onp.testing.assert_allclose(  # pyrefly: ignore[no-matching-overload]
           jaxcam.pixels_to_rays(camera, pixels, normalize_rays),
           pixels_to_rays_old(camera, pixels, normalize_rays),
       )
@@ -496,7 +496,7 @@ def create_camera_test_class(xnp, xnp_name: str):
 
           def loss(points, camera):
             projections = jaxcam.project(camera, points)
-            return jnp.sum(jnp.square(projections))
+            return jnp.sum(jnp.square(projections))  # pyrefly: ignore[bad-argument-type]
 
           grad_func = jax.value_and_grad(
               loss,
@@ -581,7 +581,7 @@ def create_camera_test_class(xnp, xnp_name: str):
       rays = jaxcam.pixels_to_rays(camera, pixels)
       scaled_pixels = pixels * scale_factor
       scaled_rays = jaxcam.pixels_to_rays(scaled_camera, scaled_pixels)
-      onp.testing.assert_allclose(rays, scaled_rays, atol=1e-5)
+      onp.testing.assert_allclose(rays, scaled_rays, atol=1e-5)  # pyrefly: ignore[no-matching-overload]
 
   CameraTestBase.__name__ = f'CameraTest_{xnp_name}'
   return CameraTestBase

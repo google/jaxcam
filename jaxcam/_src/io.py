@@ -44,7 +44,7 @@ def from_nerfies_json_file(path: PathType) -> jaxcam.Camera:
   with path.open('r') as fp:
     camera_dict = json.load(fp)
   camera_dict = {k: np.asarray(v) for k, v in camera_dict.items()}
-  return jaxcam.Camera.create(**camera_dict)
+  return jaxcam.Camera.create(**camera_dict)  # pyrefly: ignore[bad-argument-type]
 
 
 def to_nerfies_json_file(path: PathType, camera: jaxcam.Camera) -> None:

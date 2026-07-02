@@ -43,7 +43,7 @@ def einsum(subscripts: str, /, *operands: npt.ArrayLike) -> npt.ArrayLike:
         subscripts, *operands, precision=jax.lax.Precision.HIGHEST
     )
   elif xnp is onp:
-    return onp.einsum(subscripts, *operands)
+    return onp.einsum(subscripts, *operands)  # pyrefly: ignore[no-matching-overload]
   else:
     raise ValueError(f'Unsupported numpy-like module: {xnp}')
 
@@ -52,7 +52,7 @@ def matmul(a: npt.ArrayLike, b: npt.ArrayLike) -> npt.ArrayLike:
   """Matrix-matrix product that prevents uses bfloat16 by default on TPU."""
   xnp = a.__array_namespace__()
   if xnp is jnp:
-    return jnp.matmul(a, b, precision=jax.lax.Precision.HIGHEST)
+    return jnp.matmul(a, b, precision=jax.lax.Precision.HIGHEST)  # pyrefly: ignore[bad-argument-type]
   elif xnp is onp:
     return onp.matmul(a, b)
   else:
@@ -99,4 +99,4 @@ def transform_point(
     translation: npt.ArrayLike,
 ) -> npt.ArrayLike:
   """Transforms the given point x as `scale * rotation @ x + translation`."""
-  return scale * matmul(rotation, point) + translation
+  return scale * matmul(rotation, point) + translation  # pyrefly: ignore[unsupported-operation]

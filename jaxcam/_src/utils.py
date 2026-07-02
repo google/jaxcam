@@ -40,7 +40,7 @@ def rts_to_sim3(
   """
 
   transform = np.eye(4)
-  transform = transform.at[:3, :3].set(rotation * scale)
+  transform = transform.at[:3, :3].set(rotation * scale)  # pyrefly: ignore[missing-attribute, unsupported-operation]
   transform = transform.at[:3, 3].set(translation)
 
   return transform
@@ -61,11 +61,11 @@ def sim3_to_rts(
   """
 
   eps = np.float32(np.finfo(np.float32).tiny)
-  rotation_scale = transform[..., :3, :3]
+  rotation_scale = transform[..., :3, :3]  # pyrefly: ignore[bad-index]
   # Assumes rotation is an orthonormal transform, thus taking norm of first row.
-  scale = optax.safe_norm(rotation_scale, min_norm=eps, axis=1)[0]
-  rotation = rotation_scale / scale
-  translation = transform[..., :3, 3]
+  scale = optax.safe_norm(rotation_scale, min_norm=eps, axis=1)[0]  # pyrefly: ignore[bad-argument-type]
+  rotation = rotation_scale / scale  # pyrefly: ignore[unsupported-operation]
+  translation = transform[..., :3, 3]  # pyrefly: ignore[bad-index]
   return rotation, translation, scale
 
 
@@ -107,7 +107,7 @@ def transform_camera(
     Transformed cameras.
   """
   rotation, translation, scale = sim3_to_rts(transform)
-  transform = rts_to_sim3(rotation, translation, 1.0)
+  transform = rts_to_sim3(rotation, translation, 1.0)  # pyrefly: ignore[bad-assignment]
   camera_from_world = jaxcam.world_to_camera_matrix(camera)
 
   camera_from_transform = math.matmul(
@@ -125,7 +125,7 @@ def transform_to_identity_rotation(
   """Transforms a camera to have an identity rotation."""
   rotation = camera.orientation.T
   transform = rts_to_sim3(rotation, np.zeros(3), 1.0)
-  return transform_camera(camera, transform)
+  return transform_camera(camera, transform)  # pyrefly: ignore[bad-argument-type]
 
 
 def relativize_rotation(
@@ -148,6 +148,6 @@ def relativize_rotation(
 
   transform = reference.orientation.T
   transform = rts_to_sim3(transform, np.zeros(3), 1.0)
-  rel_reference = transform_camera(reference, transform)
-  rel_target = transform_camera(target, transform)
+  rel_reference = transform_camera(reference, transform)  # pyrefly: ignore[bad-argument-type]
+  rel_target = transform_camera(target, transform)  # pyrefly: ignore[bad-argument-type]
   return rel_reference, rel_target

@@ -85,14 +85,14 @@ class Rays:
             'Directions and moments must have the same shape. Got '
             f'{directions.shape} and {moments.shape}'
         )
-      origins = jnp.cross(directions, moments, axis=-1)
+      origins = jnp.cross(directions, moments, axis=-1)  # pyrefly: ignore[bad-argument-type]
     elif origins is not None:
       if directions.shape != origins.shape:
         raise ValueError(
             'Directions and origins must have the same shape. Got '
             f'{directions.shape} and {origins.shape}'
         )
-    return cls(directions=directions, origins=origins)
+    return cls(directions=directions, origins=origins)  # pyrefly: ignore[bad-argument-type]
 
   @property
   def moments(self) -> npt.ArrayLike:
@@ -112,7 +112,7 @@ class Rays:
       A (..., 6) raymap representation of the rays.
     """
     if use_plucker:
-      return jnp.concatenate((self.moments, self.directions), axis=-1)
+      return jnp.concatenate((self.moments, self.directions), axis=-1)  # pyrefly: ignore[bad-argument-type]
     else:
       return jnp.concatenate((self.origins, self.directions), axis=-1)
 
@@ -123,8 +123,8 @@ class Rays:
       use_plucker: bool = False,
   ) -> 'Rays':
     """Creates a Rays object from a raymap representation."""
-    moments_or_origins = raymap[..., :3]
-    directions = raymap[..., 3:]
+    moments_or_origins = raymap[..., :3]  # pyrefly: ignore[bad-index]
+    directions = raymap[..., 3:]  # pyrefly: ignore[bad-index]
     if use_plucker:
       moments, origins = moments_or_origins, None
     else:
@@ -175,7 +175,7 @@ def get_rays_from_camera(
   # We have to put num_pixels in the first dimension to ensure that the shapes
   # can be broadcasted properly.
   pixels_flattened = jnp.reshape(  # (H * W, ..., 2)
-      pixels,
+      pixels,  # pyrefly: ignore[bad-argument-type]
       (num_pixels,) + (1,) * camera.ndim + (2,),
   )
   directions = jaxcam.pixels_to_rays(
@@ -184,13 +184,13 @@ def get_rays_from_camera(
   # axes: (1, 2, ..., N-2, 0, N-1)
   axes = list(range(directions.ndim))[1:]
   axes.insert(-1, 0)
-  directions = jnp.transpose(directions, axes)  # (..., H * W, 3)
+  directions = jnp.transpose(directions, axes)  # (..., H * W, 3)  # pyrefly: ignore[bad-argument-type]
   # (..., H, W, 3)
   directions = jnp.reshape(
       directions, camera.shape + (image_size[1], image_size[0], 3)
   )
   origins = jnp.broadcast_to(
-      jnp.expand_dims(camera.position, axis=(-2, -3)),
+      jnp.expand_dims(camera.position, axis=(-2, -3)),  # pyrefly: ignore[bad-argument-type]
       camera.shape + (image_size[1], image_size[0], 3),
   )
   return Rays.create(directions=directions, origins=origins)
@@ -240,9 +240,9 @@ def get_camera_from_rays(
       use_ransac=use_ransac,
       ransac_parameters=ransac_parameters,
   )
-  focal_length = (intrinsics[0, 0] + intrinsics[1, 1]) / 2
-  principal_point = intrinsics[:2, 2]
-  skew = intrinsics[0, 1]
+  focal_length = (intrinsics[0, 0] + intrinsics[1, 1]) / 2  # pyrefly: ignore[bad-index, unsupported-operation]
+  principal_point = intrinsics[:2, 2]  # pyrefly: ignore[bad-index]
+  skew = intrinsics[0, 1]  # pyrefly: ignore[bad-index]
   return jaxcam.Camera.create(
       orientation=orientation,
       image_size=jnp.array([width, height]),
@@ -337,7 +337,7 @@ def _compute_homography_transform_ransac(
         replace=False,
     )
     homography = _compute_homography_transform(
-        directions1[random_inds], directions2[random_inds]
+        directions1[random_inds], directions2[random_inds]  # pyrefly: ignore[bad-index]
     )
     # Compute inliers by checking alignment of projected ray (opposite rays
     # also count as inliers).
@@ -379,8 +379,8 @@ def _compute_homography_transform(
   Returns:
     A (3, 3) homography matrix.
   """
-  x1, y1, z1 = jnp.split(directions1, 3, axis=-1)
-  x2, y2, z2 = jnp.split(directions2, 3, axis=-1)
+  x1, y1, z1 = jnp.split(directions1, 3, axis=-1)  # pyrefly: ignore[bad-argument-type]
+  x2, y2, z2 = jnp.split(directions2, 3, axis=-1)  # pyrefly: ignore[bad-argument-type]
   z = jnp.zeros_like(x1)
   # Eq 4.1 in H&Z.
   a_x = jnp.concatenate(
@@ -415,10 +415,10 @@ def _positivize(
     A tuple of (calib, rotation).
   """
   sign = jnp.sign(calib.diagonal())
-  calib = calib * sign[None, :]
-  rotation = rotation * sign[:, None]
+  calib = calib * sign[None, :]  # pyrefly: ignore[unsupported-operation]
+  rotation = rotation * sign[:, None]  # pyrefly: ignore[unsupported-operation]
   # Ensure valid rotation matrix.
   rotation = jax.lax.cond(
-      jnp.linalg.det(rotation) < 0, lambda: -rotation, lambda: rotation
+      jnp.linalg.det(rotation) < 0, lambda: -rotation, lambda: rotation  # pyrefly: ignore[unsupported-operation]
   )
   return calib, rotation
