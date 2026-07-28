@@ -37,7 +37,7 @@ def einsum(subscripts: str, /, *operands: npt.ArrayLike) -> npt.ArrayLike:
   Returns:
     The result of xnp.einsum(subscripts, *operands, precision=HIGHEST)
   """
-  xnp = operands[0].__array_namespace__()
+  xnp = operands[0].__array_namespace__()  # pyrefly: ignore[missing-attribute]
   if xnp is jnp:
     return jnp.einsum(
         subscripts, *operands, precision=jax.lax.Precision.HIGHEST
@@ -50,7 +50,7 @@ def einsum(subscripts: str, /, *operands: npt.ArrayLike) -> npt.ArrayLike:
 
 def matmul(a: npt.ArrayLike, b: npt.ArrayLike) -> npt.ArrayLike:
   """Matrix-matrix product that prevents uses bfloat16 by default on TPU."""
-  xnp = a.__array_namespace__()
+  xnp = a.__array_namespace__()  # pyrefly: ignore[missing-attribute]
   if xnp is jnp:
     return jnp.matmul(a, b, precision=jax.lax.Precision.HIGHEST)  # pyrefly: ignore[bad-argument-type]
   elif xnp is onp:
@@ -83,7 +83,7 @@ def skew(vector: npt.ArrayLike) -> npt.ArrayLike:
     vector, W is the corresponding skew-symmatrix matrix, and v is another
     vector.
   """
-  xnp = vector.__array_namespace__()
+  xnp = vector.__array_namespace__()  # pyrefly: ignore[missing-attribute]
   vector = xnp.reshape(vector, (3))
   return xnp.array([
       [0.0, -vector[2], vector[1]],

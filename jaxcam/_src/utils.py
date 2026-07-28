@@ -110,7 +110,7 @@ def transform_camera(
   transform = rts_to_sim3(rotation, translation, 1.0)  # pyrefly: ignore[bad-assignment]
   camera_from_world = jaxcam.world_to_camera_matrix(camera)
 
-  camera_from_transform = math.matmul(
+  camera_from_transform = math.matmul(  # pyrefly: ignore[missing-attribute]
       camera_from_world, transform[None]
   ).squeeze(0)
   camera = jaxcam.update_world_to_camera_matrix(camera, camera_from_transform)
@@ -123,7 +123,7 @@ def transform_to_identity_rotation(
     camera: jaxcam.Camera,
 ) -> jaxcam.Camera:
   """Transforms a camera to have an identity rotation."""
-  rotation = camera.orientation.T
+  rotation = camera.orientation.T  # pyrefly: ignore[missing-attribute]
   transform = rts_to_sim3(rotation, np.zeros(3), 1.0)
   return transform_camera(camera, transform)  # pyrefly: ignore[bad-argument-type]
 
@@ -146,7 +146,7 @@ def relativize_rotation(
     reference camera will have an identity world-to-camera matrix.
   """
 
-  transform = reference.orientation.T
+  transform = reference.orientation.T  # pyrefly: ignore[missing-attribute]
   transform = rts_to_sim3(transform, np.zeros(3), 1.0)
   rel_reference = transform_camera(reference, transform)  # pyrefly: ignore[bad-argument-type]
   rel_target = transform_camera(target, transform)  # pyrefly: ignore[bad-argument-type]

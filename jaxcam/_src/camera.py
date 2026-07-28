@@ -163,10 +163,10 @@ class Camera:
     if image_size is None:
       image_size = xnp.ones(2)
     if principal_point is None:
-      principal_point = image_size / 2.0
+      principal_point = image_size / 2.0  # pyrefly: ignore[unsupported-operation]
     if focal_length is None:
       # Default focal length produces a FoV of 2*atan(0.5) ~= 53 degrees.
-      focal_length = image_size[..., 0]
+      focal_length = image_size[..., 0]  # pyrefly: ignore[bad-index]
 
     # Ensure all items are strongly typed arrays to avoid triggering a cache
     # miss during JIT compilation due to weak type semantics.
@@ -187,7 +187,7 @@ class Camera:
       # Insert the 4th radial distortion coefficient if not present.
       radial_distortion = xnp.pad(
           asarray(radial_distortion),
-          pad_width=(0, 4 - radial_distortion.shape[-1]),
+          pad_width=(0, 4 - radial_distortion.shape[-1]),  # pyrefly: ignore[missing-attribute]
       )
       kwargs['radial_distortion'] = asarray(radial_distortion)
 
@@ -235,7 +235,7 @@ class Camera:
     if not any(field_is_batched.values()):
       return None
     field_axes = {k: 0 if v else None for k, v in field_is_batched.items()}
-    return type(self)(**field_axes)
+    return type(self)(**field_axes)  # pyrefly: ignore[bad-argument-type]
 
   @classmethod
   def pytree_fields(cls) -> list[dataclasses.Field[Any]]:
@@ -432,23 +432,23 @@ class Camera:
 
   @property
   def principal_point_x(self) -> ArrayLike:
-    return self.principal_point[..., 0]
+    return self.principal_point[..., 0]  # pyrefly: ignore[bad-index]
 
   @property
   def principal_point_y(self) -> ArrayLike:
-    return self.principal_point[..., 1]
+    return self.principal_point[..., 1]  # pyrefly: ignore[bad-index]
 
   @property
   def image_size_x(self) -> ArrayLike:
-    return self.image_size[..., 0]
+    return self.image_size[..., 0]  # pyrefly: ignore[bad-index]
 
   @property
   def image_size_y(self) -> ArrayLike:
-    return self.image_size[..., 1]
+    return self.image_size[..., 1]  # pyrefly: ignore[bad-index]
 
   @property
   def optical_axis(self) -> ArrayLike:
-    return self.orientation[..., 2, :]
+    return self.orientation[..., 2, :]  # pyrefly: ignore[bad-index]
 
   @property
   def has_distortion(self) -> bool:
@@ -465,13 +465,13 @@ class Camera:
   @property
   def translation(self) -> ArrayLike:
     # pylint: disable=invalid-unary-operand-type
-    return math.matvecmul(-self.orientation, self.position)
+    return math.matvecmul(-self.orientation, self.position)  # pyrefly: ignore[unsupported-operation]
 
   @property
   def world_to_camera_matrix(self) -> ArrayLike:
     """Returns the 4x4 matrix that takes world points to camera coordinates."""
     matrix_3x4 = self.xnp.concatenate(
-        [self.orientation, self.translation[..., None]], axis=-1
+        [self.orientation, self.translation[..., None]], axis=-1  # pyrefly: ignore[bad-index]
     )
     return _to_matrix_4x4(matrix_3x4)
 
@@ -480,7 +480,7 @@ class Camera:
     """Returns the 4x4 matrix that takes camera points to world coordinates."""
     xnp = self.xnp
     o = xnp.matrix_transpose(self.orientation)
-    p = xnp.broadcast_to(self.position[..., None], o.shape[:-1] + (1,))
+    p = xnp.broadcast_to(self.position[..., None], o.shape[:-1] + (1,))  # pyrefly: ignore[bad-index]
     matrix = xnp.concatenate([o, p], axis=-1)
     return _to_matrix_4x4(matrix)
 
@@ -517,11 +517,11 @@ def create(*args, **kwargs) -> Camera:
 
 def _to_matrix_4x4(matrix: ArrayLike):
   """Converts a matrix to a 4x4 matrix."""
-  if matrix.shape[-2] > 4 or matrix.shape[-1] > 4:
+  if matrix.shape[-2] > 4 or matrix.shape[-1] > 4:  # pyrefly: ignore[missing-attribute]
     raise ValueError('Matrix dimensions must be a maximum of 4x4.')
 
-  xnp = matrix.__array_namespace__()
-  shape, (n, m) = matrix.shape[:-2], matrix.shape[-2:]
+  xnp = matrix.__array_namespace__()  # pyrefly: ignore[missing-attribute]
+  shape, (n, m) = matrix.shape[:-2], matrix.shape[-2:]  # pyrefly: ignore[missing-attribute]
   matrix_4x4 = xnp.concatenate(
       [
           xnp.concatenate(
@@ -550,8 +550,8 @@ def _distort_local_pixels(
     x, y = _radial_and_tangential_undistort(
         x,
         y,
-        radial_distortion=camera.radial_distortion,
-        tangential_distortion=camera.tangential_distortion,
+        radial_distortion=camera.radial_distortion,  # pyrefly: ignore[bad-argument-type]
+        tangential_distortion=camera.tangential_distortion,  # pyrefly: ignore[bad-argument-type]
     )
   elif camera.has_distortion:
     x, y = _radial_and_tangential_distort(
@@ -583,8 +583,8 @@ def _undistort_local_pixels(
     x, y = _radial_and_tangential_undistort(
         x,
         y,
-        radial_distortion=camera.radial_distortion,
-        tangential_distortion=camera.tangential_distortion,
+        radial_distortion=camera.radial_distortion,  # pyrefly: ignore[bad-argument-type]
+        tangential_distortion=camera.tangential_distortion,  # pyrefly: ignore[bad-argument-type]
     )
 
   return x, y
@@ -595,16 +595,16 @@ def pixels_to_local_rays(
 ) -> ArrayLike:
   """Returns local ray directions for the provided pixels."""
   xnp = camera.xnp
-  y = (pixels[..., 1] - camera.principal_point_y) / camera.scale_factor_y
-  x = (
-      pixels[..., 0] - camera.principal_point_x - y * camera.skew
+  y = (pixels[..., 1] - camera.principal_point_y) / camera.scale_factor_y  # pyrefly: ignore[bad-index, unsupported-operation]
+  x = (  # pyrefly: ignore[unsupported-operation]
+      pixels[..., 0] - camera.principal_point_x - y * camera.skew  # pyrefly: ignore[bad-index, unsupported-operation]
   ) / camera.scale_factor_x
 
   x, y = _undistort_local_pixels(camera, x, y)
 
   dirs = xnp.stack([x, y, xnp.ones_like(x)], axis=-1)
   if camera.projection_type is ProjectionType.FISHEYE:
-    theta = xnp.sqrt(x**2 + y**2)
+    theta = xnp.sqrt(x**2 + y**2)  # pyrefly: ignore[unsupported-operation]
     theta = xnp.minimum(xnp.pi, theta)
     sin_theta_over_theta = xnp.sin(theta) / theta
     fisheye_dir = xnp.stack(
@@ -615,7 +615,7 @@ def pixels_to_local_rays(
         ],
         axis=-1,
     )
-    eps = xnp.finfo(x.dtype).eps
+    eps = xnp.finfo(x.dtype).eps  # pyrefly: ignore[missing-attribute]
     # It is approximately perspective when the viewing ray is too close to the
     # optical axis.
     if normalize:
@@ -645,7 +645,7 @@ def pixels_to_rays(
   Returns:
       An array containing the normalized ray directions in world coordinates.
   """
-  if pixels.shape[-1] != 2:
+  if pixels.shape[-1] != 2:  # pyrefly: ignore[missing-attribute]
     raise ValueError('The last dimension of pixels must be 2.')
   xnp = camera.xnp
 
@@ -662,9 +662,9 @@ def pixels_to_points(
   """Unprojects pixels and depth to (x,y,z,w) homogenous world-space points."""
   rays_through_pixels = pixels_to_rays(camera, pixels)
   ray_depth = depth_to_ray_depth(camera, rays_through_pixels, depth)
-  points = rays_through_pixels * ray_depth[..., None] + camera.position
+  points = rays_through_pixels * ray_depth[..., None] + camera.position  # pyrefly: ignore[bad-index, unsupported-operation]
   xnp = camera.xnp
-  pad_shape = [(0, 0)] * len(depth.shape) + [(0, 1)]
+  pad_shape = [(0, 0)] * len(depth.shape) + [(0, 1)]  # pyrefly: ignore[missing-attribute]
   points = xnp.pad(points, pad_shape, constant_values=1.0)
   return points
 
@@ -684,7 +684,7 @@ def world_points_to_local_points(
   Returns:
     The local-space coordinates.
   """
-  translated_points = world_points - camera.position
+  translated_points = world_points - camera.position  # pyrefly: ignore[unsupported-operation]
   return math.matvecmul(camera.orientation, translated_points)
 
 
@@ -708,7 +708,7 @@ def local_points_to_world_points(
       xnp.matrix_transpose(camera.orientation),
       local_points,
   )
-  return rotated_points + camera.position
+  return rotated_points + camera.position  # pyrefly: ignore[unsupported-operation]
 
 
 def depth_to_ray_depth(
@@ -727,7 +727,7 @@ def depth_to_ray_depth(
     (..., 3) The depth along the optical axis for each ray.
   """
   cosa = math.dot(ray, camera.optical_axis)
-  return depth / cosa
+  return depth / cosa  # pyrefly: ignore[unsupported-operation]
 
 
 def ray_depth_to_depth(
@@ -746,7 +746,7 @@ def ray_depth_to_depth(
     (..., 3) The depth along the optical axis for each ray.
   """
   cosa = math.dot(ray, camera.optical_axis)
-  return ray_depth * cosa
+  return ray_depth * cosa  # pyrefly: ignore[unsupported-operation]
 
 
 def world_to_camera_matrix(camera: Camera) -> ArrayLike:
@@ -775,13 +775,13 @@ def update_world_to_camera_matrix(camera: Camera, matrix: ArrayLike) -> Camera:
     Camera with updated orientation and position after applying transform.
   """
 
-  if matrix.shape[-2:] != (4, 4):
+  if matrix.shape[-2:] != (4, 4):  # pyrefly: ignore[missing-attribute]
     raise ValueError('Last two axes of transform must have shape (3, 3).')
 
-  orientation = matrix[..., :3, :3]
-  translation = matrix[..., :3, 3]
-  position = math.einsum('... j, ... j k -> ... k', translation, -orientation)
-  return camera.replace(position=position, orientation=orientation)
+  orientation = matrix[..., :3, :3]  # pyrefly: ignore[bad-index]
+  translation = matrix[..., :3, 3]  # pyrefly: ignore[bad-index]
+  position = math.einsum('... j, ... j k -> ... k', translation, -orientation)  # pyrefly: ignore[unsupported-operation]
+  return camera.replace(position=position, orientation=orientation)  # pyrefly: ignore[missing-attribute]
 
 
 def update_translation(camera: Camera, translation: ArrayLike) -> Camera:
@@ -795,9 +795,9 @@ def update_translation(camera: Camera, translation: ArrayLike) -> Camera:
     Camera with updated translation.
   """
   new_position = math.einsum(
-      '... j, ... j k -> ... k', translation, -camera.orientation
+      '... j, ... j k -> ... k', translation, -camera.orientation  # pyrefly: ignore[unsupported-operation]
   )
-  return camera.replace(position=new_position)
+  return camera.replace(position=new_position)  # pyrefly: ignore[missing-attribute]
 
 
 def update_intrinsic_matrix(
@@ -812,21 +812,21 @@ def update_intrinsic_matrix(
   Returns:
     Camera with updated intrinsics.
   """
-  if intrinsic_matrix.shape[-2:] != (3, 3):
+  if intrinsic_matrix.shape[-2:] != (3, 3):  # pyrefly: ignore[missing-attribute]
     raise ValueError(
         'Last two axes of intrinsic_matrix must have shape (3, 3).'
     )
 
   xnp = camera.xnp
-  focal_length_x = intrinsic_matrix[..., 0, 0]
-  focal_length_y = intrinsic_matrix[..., 1, 1]
-  pixel_aspect_ratio = focal_length_y / focal_length_x
-  principal_point_x = intrinsic_matrix[..., 0, 2]
-  principal_point_y = intrinsic_matrix[..., 1, 2]
-  return camera.replace(
+  focal_length_x = intrinsic_matrix[..., 0, 0]  # pyrefly: ignore[bad-index]
+  focal_length_y = intrinsic_matrix[..., 1, 1]  # pyrefly: ignore[bad-index]
+  pixel_aspect_ratio = focal_length_y / focal_length_x  # pyrefly: ignore[unsupported-operation]
+  principal_point_x = intrinsic_matrix[..., 0, 2]  # pyrefly: ignore[bad-index]
+  principal_point_y = intrinsic_matrix[..., 1, 2]  # pyrefly: ignore[bad-index]
+  return camera.replace(  # pyrefly: ignore[missing-attribute]
       focal_length=focal_length_x,
       pixel_aspect_ratio=pixel_aspect_ratio,
-      skew=intrinsic_matrix[..., 0, 1],
+      skew=intrinsic_matrix[..., 0, 1],  # pyrefly: ignore[bad-index]
       principal_point=xnp.stack(
           [principal_point_x, principal_point_y], axis=-1
       ),
@@ -835,7 +835,7 @@ def update_intrinsic_matrix(
 
 def replace_backend(camera: Camera, xnp: Union[type(onp), type(jnp)]) -> Camera:
   cast = lambda z: None if z is None else xnp.array(z)
-  return camera.replace(
+  return camera.replace(  # pyrefly: ignore[missing-attribute]
       orientation=cast(camera.orientation),
       position=cast(camera.position),
       focal_length=cast(camera.focal_length),
@@ -865,7 +865,7 @@ def invert_radial_distortion_coefficients(
   Returns:
     The inverted radial distortion parameters.
   """
-  xnp = radial_distortion.__array_namespace__()
+  xnp = radial_distortion.__array_namespace__()  # pyrefly: ignore[missing-attribute]
   a1, a2, a3, a4 = xnp.split(radial_distortion, 4, axis=-1)
   b1 = -a1
   b2 = 3 * a1**2 - a2
@@ -883,20 +883,20 @@ def _radial_and_tangential_distort(
   """Computes the distorted pixel positions."""
   dx_radial, dy_radial = 0.0, 0.0
   dx_tangential, dy_tangential = 0.0, 0.0
-  r2 = x * x + y * y
+  r2 = x * x + y * y  # pyrefly: ignore[unsupported-operation]
 
   if radial_distortion is not None:
-    k1, k2, k3, k4 = radial_distortion
-    radial_distortion = r2 * (k1 + r2 * (k2 + r2 * (k3 + r2 * k4)))
-    dx_radial = x * radial_distortion
-    dy_radial = y * radial_distortion
+    k1, k2, k3, k4 = radial_distortion  # pyrefly: ignore[not-iterable]
+    radial_distortion = r2 * (k1 + r2 * (k2 + r2 * (k3 + r2 * k4)))  # pyrefly: ignore[unsupported-operation]
+    dx_radial = x * radial_distortion  # pyrefly: ignore[unsupported-operation]
+    dy_radial = y * radial_distortion  # pyrefly: ignore[unsupported-operation]
 
   if tangential_distortion is not None:
-    p1, p2 = tangential_distortion
-    dx_tangential = 2 * p1 * x * y + p2 * (r2 + 2 * x * x)
-    dy_tangential = 2 * p2 * x * y + p1 * (r2 + 2 * y * y)
+    p1, p2 = tangential_distortion  # pyrefly: ignore[not-iterable]
+    dx_tangential = 2 * p1 * x * y + p2 * (r2 + 2 * x * x)  # pyrefly: ignore[unsupported-operation]
+    dy_tangential = 2 * p2 * x * y + p1 * (r2 + 2 * y * y)  # pyrefly: ignore[unsupported-operation]
 
-  return x + dx_radial + dx_tangential, y + dy_radial + dy_tangential
+  return x + dx_radial + dx_tangential, y + dy_radial + dy_tangential  # pyrefly: ignore[unsupported-operation]
 
 
 def _radial_and_tangential_undistort(
@@ -932,11 +932,11 @@ def _radial_and_tangential_undistort(
         radial_distortion=radial_distortion,
         tangential_distortion=tangential_distortion,
     )
-    xy_distorted_pred = jnp.stack([x_distorted_pred, y_distorted_pred], axis=-1)
+    xy_distorted_pred = jnp.stack([x_distorted_pred, y_distorted_pred], axis=-1)  # pyrefly: ignore[bad-argument-type]
     return xy_distorted_pred - xy_distorted
 
-  batch_shape = x_distorted.shape
-  xy_distorted = jnp.stack([x_distorted, y_distorted], axis=-1)
+  batch_shape = x_distorted.shape  # pyrefly: ignore[missing-attribute]
+  xy_distorted = jnp.stack([x_distorted, y_distorted], axis=-1)  # pyrefly: ignore[bad-argument-type]
   xy_distorted = xy_distorted.reshape(-1, 2)
 
   # Run Newton's method.
@@ -965,13 +965,13 @@ def project(camera: Camera, points: ArrayLike) -> ArrayLike:
     A (..., 2) array containing the projected pixel locations.
   """
   xnp = camera.xnp
-  eps = xnp.finfo(points.dtype).eps
-  batch_shape = points.shape[:-1]
+  eps = xnp.finfo(points.dtype).eps  # pyrefly: ignore[missing-attribute]
+  batch_shape = points.shape[:-1]  # pyrefly: ignore[missing-attribute]
   local_points = world_points_to_local_points(camera, points)
 
-  local_x = local_points[..., 0]
-  local_y = local_points[..., 1]
-  local_z = local_points[..., 2]
+  local_x = local_points[..., 0]  # pyrefly: ignore[bad-index]
+  local_y = local_points[..., 1]  # pyrefly: ignore[bad-index]
+  local_z = local_points[..., 2]  # pyrefly: ignore[bad-index]
 
   # Get normalized local pixel positions.
   if _SILENCE_NANS:
@@ -981,11 +981,11 @@ def project(camera: Camera, points: ArrayLike) -> ArrayLike:
     x = local_x * denominator
     y = local_y * denominator
   else:
-    x = local_x / local_z
-    y = local_y / local_z
+    x = local_x / local_z  # pyrefly: ignore[unsupported-operation]
+    y = local_y / local_z  # pyrefly: ignore[unsupported-operation]
 
   if camera.projection_type is ProjectionType.FISHEYE:
-    magnitude_sq = local_x**2 + local_y**2
+    magnitude_sq = local_x**2 + local_y**2  # pyrefly: ignore[unsupported-operation]
     if _SILENCE_NANS:
       r = xnp.sqrt(xnp.where(magnitude_sq < eps, eps ** 2, magnitude_sq))
     else:
@@ -1000,9 +1000,9 @@ def project(camera: Camera, points: ArrayLike) -> ArrayLike:
   x, y = _distort_local_pixels(camera, x, y)
 
   # Map the distorted ray to the image plane and return the depth.
-  pixel_x = camera.focal_length * x + camera.skew * y + camera.principal_point_x
+  pixel_x = camera.focal_length * x + camera.skew * y + camera.principal_point_x  # pyrefly: ignore[unsupported-operation]
   pixel_y = (
-      camera.focal_length * camera.pixel_aspect_ratio * y
+      camera.focal_length * camera.pixel_aspect_ratio * y  # pyrefly: ignore[unsupported-operation]
       + camera.principal_point_y
   )
 
@@ -1037,7 +1037,7 @@ def look_at(
   xnp = camera.xnp
 
   vector_degeneracy_cutoff = 1e-6
-  forward = center - eye
+  forward = center - eye  # pyrefly: ignore[unsupported-operation]
   forward_norm = xnp.linalg.norm(forward)
 
   try:
@@ -1077,7 +1077,7 @@ def look_at(
   ])
 
   view_translation = xnp.vstack([
-      xnp.hstack([xnp.eye(3), -eye[:, None]]),
+      xnp.hstack([xnp.eye(3), -eye[:, None]]),  # pyrefly: ignore[bad-index, unsupported-operation]
       xnp.array([[0, 0, 0, 1]]),
   ])
 
@@ -1112,19 +1112,19 @@ def scale(camera: Camera, amount: float | ArrayLike) -> Camera:
   """Scales the camera by the given amount."""
   # First round the image size to a round number.
   xnp = camera.xnp
-  new_image_size = xnp.round(camera.image_size * amount)
+  new_image_size = xnp.round(camera.image_size * amount)  # pyrefly: ignore[unsupported-operation]
   return scale_to_image_size(camera, new_image_size)
 
 
 def scale_to_image_size(camera: Camera, image_size: ArrayLike) -> Camera:
   """Scales the camera to the given image size."""
-  scale_xy = image_size / camera.image_size
-  scale_x = scale_xy[..., 0]
-  scale_y = scale_xy[..., 1]
-  return camera.replace(
+  scale_xy = image_size / camera.image_size  # pyrefly: ignore[unsupported-operation]
+  scale_x = scale_xy[..., 0]  # pyrefly: ignore[bad-index]
+  scale_y = scale_xy[..., 1]  # pyrefly: ignore[bad-index]
+  return camera.replace(  # pyrefly: ignore[missing-attribute]
       focal_length=camera.focal_length * scale_x,
       pixel_aspect_ratio=scale_y / scale_x * camera.pixel_aspect_ratio,
-      principal_point=camera.principal_point * scale_xy,
+      principal_point=camera.principal_point * scale_xy,  # pyrefly: ignore[unsupported-operation]
       skew=camera.skew * scale_x,
       image_size=image_size,
   )
@@ -1158,7 +1158,7 @@ def crop(
   new_image_size = camera.image_size - crop_left_top - crop_right_bottom
   new_principal_point = camera.principal_point - crop_left_top
 
-  return camera.replace(
+  return camera.replace(  # pyrefly: ignore[missing-attribute]
       principal_point=new_principal_point,
       image_size=new_image_size,
   )
@@ -1261,7 +1261,7 @@ def transform(
   new_position = math.transform_point(
       camera.position, scale=scale, rotation=rotation, translation=translation
   )
-  return camera.replace(orientation=new_orientation, position=new_position)
+  return camera.replace(orientation=new_orientation, position=new_position)  # pyrefly: ignore[missing-attribute]
 
 
 def relative_transform(reference: Camera, target: Camera) -> ArrayLike:

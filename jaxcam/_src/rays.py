@@ -80,15 +80,17 @@ class Rays:
       raise ValueError('Must specify either origins or moments.')
 
     if moments is not None:
-      if directions.shape != moments.shape:
+      if directions.shape != moments.shape:  # pyrefly: ignore[missing-attribute]
         raise ValueError(
+            # pyrefly: ignore[missing-attribute]
             'Directions and moments must have the same shape. Got '
             f'{directions.shape} and {moments.shape}'
         )
       origins = jnp.cross(directions, moments, axis=-1)  # pyrefly: ignore[bad-argument-type]
     elif origins is not None:
-      if directions.shape != origins.shape:
+      if directions.shape != origins.shape:  # pyrefly: ignore[missing-attribute]
         raise ValueError(
+            # pyrefly: ignore[missing-attribute]
             'Directions and origins must have the same shape. Got '
             f'{directions.shape} and {origins.shape}'
         )
@@ -162,7 +164,7 @@ def get_rays_from_camera(
     Rays of shape (*camera.shape, H, W, 6).
   """
   if image_size is None:
-    image_size = camera.image_size.astype(int)
+    image_size = camera.image_size.astype(int)  # pyrefly: ignore[missing-attribute]
   if not disable_image_size_check and jnp.any(
       camera.image_size != jnp.array([image_size[0], image_size[1]])
   ):
@@ -182,7 +184,7 @@ def get_rays_from_camera(
       camera, pixels_flattened, normalize=normalize
   )
   # axes: (1, 2, ..., N-2, 0, N-1)
-  axes = list(range(directions.ndim))[1:]
+  axes = list(range(directions.ndim))[1:]  # pyrefly: ignore[missing-attribute]
   axes.insert(-1, 0)
   directions = jnp.transpose(directions, axes)  # (..., H * W, 3)  # pyrefly: ignore[bad-argument-type]
   # (..., H, W, 3)
@@ -332,7 +334,7 @@ def _compute_homography_transform_ransac(
     rng, key = jax.random.split(rng)
     random_inds = jax.random.choice(
         key,
-        jnp.arange(directions1.shape[0]),
+        jnp.arange(directions1.shape[0]),  # pyrefly: ignore[missing-attribute]
         shape=(num_correspondences,),
         replace=False,
     )
@@ -341,7 +343,7 @@ def _compute_homography_transform_ransac(
     )
     # Compute inliers by checking alignment of projected ray (opposite rays
     # also count as inliers).
-    proj = math.matmul(homography, directions1.T).T
+    proj = math.matmul(homography, directions1.T).T  # pyrefly: ignore[missing-attribute]
     proj = proj / jnp.linalg.norm(proj, keepdims=True, axis=-1)
     dot = jnp.clip(jnp.sum(proj * directions2, axis=-1), -1, 1)
     dist = jnp.arccos(jnp.abs(dot))
@@ -414,7 +416,7 @@ def _positivize(
   Returns:
     A tuple of (calib, rotation).
   """
-  sign = jnp.sign(calib.diagonal())
+  sign = jnp.sign(calib.diagonal())  # pyrefly: ignore[missing-attribute]
   calib = calib * sign[None, :]  # pyrefly: ignore[unsupported-operation]
   rotation = rotation * sign[:, None]  # pyrefly: ignore[unsupported-operation]
   # Ensure valid rotation matrix.

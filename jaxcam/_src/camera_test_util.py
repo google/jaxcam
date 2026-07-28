@@ -189,7 +189,7 @@ def create_camera_test_class(xnp, xnp_name: str):
       ) -> onp.ndarray:
         world_points_flat = world_points.reshape((-1, 3))
         translated_points = world_points_flat - camera_pos
-        local_points = (math.matmul(camera_orient, translated_points.T)).T
+        local_points = (math.matmul(camera_orient, translated_points.T)).T  # pyrefly: ignore[missing-attribute]
         return local_points.reshape(world_points.shape)
 
       expected = world_points_to_local_points_old(
@@ -214,7 +214,7 @@ def create_camera_test_class(xnp, xnp_name: str):
           local_points: onp.ndarray,
       ) -> onp.ndarray:
         local_points_flat = local_points.reshape((-1, 3))
-        rotated_points = math.matmul(camera_orient.T, local_points_flat.T).T
+        rotated_points = math.matmul(camera_orient.T, local_points_flat.T).T  # pyrefly: ignore[missing-attribute]
         world_points = rotated_points + camera_pos
         return world_points.reshape(local_points.shape)
 
@@ -315,7 +315,7 @@ def create_camera_test_class(xnp, xnp_name: str):
       orientation_xnp = xnp.broadcast_to(xnp.eye(3), (*batch_shape, 3, 3))
       camera = jaxcam.Camera.create(xnp=xnp, orientation=orientation_xnp)
       expected_shape = onp.broadcast_shapes(batch_shape, ())
-      self.assertEqual(camera.translation.shape, (*expected_shape, 3))
+      self.assertEqual(camera.translation.shape, (*expected_shape, 3))  # pyrefly: ignore[missing-attribute]
 
     @parameterized.product(batch_shapes=_SHAPES_THAT_BROADCAST)
     def test_batched_world_points_to_local_points(self, batch_shapes):
@@ -326,7 +326,7 @@ def create_camera_test_class(xnp, xnp_name: str):
       points = xnp.zeros((*batch_shape_b, 3))
       expected_shape = onp.broadcast_shapes(batch_shape_a, batch_shape_b)
       self.assertEqual(
-          jaxcam.world_points_to_local_points(camera, points).shape,
+          jaxcam.world_points_to_local_points(camera, points).shape,  # pyrefly: ignore[missing-attribute]
           (*expected_shape, 3),
       )
 
@@ -339,7 +339,7 @@ def create_camera_test_class(xnp, xnp_name: str):
       local_points = xnp.zeros((*batch_shape_b, 3))
       expected_shape = onp.broadcast_shapes(batch_shape_a, batch_shape_b)
       self.assertEqual(
-          jaxcam.local_points_to_world_points(camera, local_points).shape,
+          jaxcam.local_points_to_world_points(camera, local_points).shape,  # pyrefly: ignore[missing-attribute]
           (*expected_shape, 3),
       )
 
@@ -353,7 +353,7 @@ def create_camera_test_class(xnp, xnp_name: str):
       depth = xnp.ones(batch_shape_c)
       expected_shape = onp.broadcast_shapes(*batch_shapes)
       self.assertEqual(
-          jaxcam.depth_to_ray_depth(camera, rays, depth).shape, expected_shape
+          jaxcam.depth_to_ray_depth(camera, rays, depth).shape, expected_shape  # pyrefly: ignore[missing-attribute]
       )
 
     @parameterized.product(batch_shapes=_SHAPES_THAT_BROADCAST)
@@ -366,7 +366,7 @@ def create_camera_test_class(xnp, xnp_name: str):
       depth = xnp.ones(batch_shape_c)
       expected_shape = onp.broadcast_shapes(*batch_shapes)
       self.assertEqual(
-          jaxcam.ray_depth_to_depth(camera, rays, depth).shape, expected_shape
+          jaxcam.ray_depth_to_depth(camera, rays, depth).shape, expected_shape  # pyrefly: ignore[missing-attribute]
       )
 
     @parameterized.product(
@@ -383,7 +383,7 @@ def create_camera_test_class(xnp, xnp_name: str):
       pixels = xnp.zeros((*batch_shape_b, 2))
       expected_shape = onp.broadcast_shapes(batch_shape_a, batch_shape_b)
       self.assertEqual(
-          jaxcam.pixels_to_rays(camera, pixels, normalize_rays).shape,
+          jaxcam.pixels_to_rays(camera, pixels, normalize_rays).shape,  # pyrefly: ignore[missing-attribute]
           (*expected_shape, 3),
       )
 
@@ -395,7 +395,7 @@ def create_camera_test_class(xnp, xnp_name: str):
       cameras = jaxcam.Camera.create(xnp=xnp, orientation=orientation_xnp)
       expected_shape = onp.broadcast_shapes(batch_shape, ())
       self.assertEqual(
-          cameras.camera_to_world_matrix.shape, (*expected_shape, 4, 4)
+          cameras.camera_to_world_matrix.shape, (*expected_shape, 4, 4)  # pyrefly: ignore[missing-attribute]
       )
 
     @parameterized.product(
@@ -414,7 +414,7 @@ def create_camera_test_class(xnp, xnp_name: str):
       camera1 = jaxcam.Camera.create(xnp=xnp, orientation=orientation1)
       camera2 = camera1.reshape(shape2)
       self.assertEqual(camera2.shape, shape2)
-      self.assertEqual(camera2.orientation.shape, shape2 + (3, 3))
+      self.assertEqual(camera2.orientation.shape, shape2 + (3, 3))  # pyrefly: ignore[missing-attribute]
 
     def test_pickle_unpickle(self):
       """Tests that pickling and unpickling works correctly."""
