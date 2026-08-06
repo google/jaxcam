@@ -72,8 +72,8 @@ class Rays:
       A Rays object.
     """
     # Ensure directions are unit normalized.
-    norms = jnp.linalg.norm(directions, axis=-1, keepdims=True)
-    directions = directions / norms
+    norms = jnp.linalg.norm(directions, axis=-1, keepdims=True)  # pyrefly: ignore[bad-argument-type]
+    directions = directions / norms  # pyrefly: ignore[unsupported-operation]
     if origins is not None and moments is not None:
       raise ValueError('Cannot specify both origins and moments.')
     if origins is None and moments is None:
@@ -296,7 +296,7 @@ def ray_dlt(
     )
   else:
     homography = _compute_homography_transform(directions1, directions2)
-  out = jnp.linalg.qr(homography)
+  out = jnp.linalg.qr(homography)  # pyrefly: ignore[bad-argument-type]
   # H = R.T @ K_inv, so R.T corresponds to the Q (orthonormal) and K_inv to the
   # R (upper triangular) in QR decomposition.
   intrinsics = jnp.linalg.inv(out.R)
@@ -421,6 +421,6 @@ def _positivize(
   rotation = rotation * sign[:, None]  # pyrefly: ignore[unsupported-operation]
   # Ensure valid rotation matrix.
   rotation = jax.lax.cond(
-      jnp.linalg.det(rotation) < 0, lambda: -rotation, lambda: rotation  # pyrefly: ignore[unsupported-operation]
+      jnp.linalg.det(rotation) < 0, lambda: -rotation, lambda: rotation  # pyrefly: ignore[bad-argument-type, unsupported-operation]
   )
   return calib, rotation
