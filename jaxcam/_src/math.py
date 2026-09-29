@@ -86,9 +86,9 @@ def skew(vector: npt.ArrayLike) -> npt.ArrayLike:
   xnp = vector.__array_namespace__()  # pyrefly: ignore[missing-attribute]
   vector = xnp.reshape(vector, (3))
   return xnp.array([
-      [0.0, -vector[2], vector[1]],
-      [vector[2], 0.0, -vector[0]],
-      [-vector[1], vector[0], 0.0],
+      [0.0, -vector[2], vector[1]],  # pyrefly: ignore[bad-index, unsupported-operation]
+      [vector[2], 0.0, -vector[0]],  # pyrefly: ignore[bad-index, unsupported-operation]
+      [-vector[1], vector[0], 0.0],  # pyrefly: ignore[bad-index, unsupported-operation]
   ])
 
 

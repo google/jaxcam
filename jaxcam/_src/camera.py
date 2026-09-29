@@ -135,7 +135,7 @@ class Camera:
       pytree_node=False, default=ProjectionType.PERSPECTIVE
   )
   use_inverted_distortion: bool = struct.field(pytree_node=False, default=False)
-  xnp: Union[type(jnp), type(onp)] = struct.field(
+  xnp: Union[type(jnp), type(onp)] = struct.field(  # pyrefly: ignore[invalid-annotation]
       pytree_node=False, default=jnp
   )
 
@@ -153,7 +153,7 @@ class Camera:
       tangential_distortion: Optional[ArrayLike] = None,
       invert_distortion: bool = False,
       is_fisheye: bool = False,
-      xnp: Union[type(jnp), type(onp)] = jnp,
+      xnp: Union[type(jnp), type(onp)] = jnp,  # pyrefly: ignore[invalid-annotation]
   ) -> 'Camera':
     """Creates a camera with reasonable default values."""
     if position is None:
@@ -833,7 +833,7 @@ def update_intrinsic_matrix(
   )
 
 
-def replace_backend(camera: Camera, xnp: Union[type(onp), type(jnp)]) -> Camera:
+def replace_backend(camera: Camera, xnp: Union[type(onp), type(jnp)]) -> Camera:  # pyrefly: ignore[invalid-annotation]
   cast = lambda z: None if z is None else xnp.array(z)
   return camera.replace(  # pyrefly: ignore[missing-attribute]
       orientation=cast(camera.orientation),
