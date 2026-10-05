@@ -424,11 +424,11 @@ class Camera:
 
   @property
   def scale_factor_x(self) -> ArrayLike:
-    return self.focal_length  # pytype: disable=bad-return-type  # jax-ndarray
+    return self.focal_length
 
   @property
   def scale_factor_y(self) -> ArrayLike:
-    return self.focal_length * self.pixel_aspect_ratio  # pytype: disable=bad-return-type  # jax-ndarray
+    return self.focal_length * self.pixel_aspect_ratio  # pyrefly: ignore[unsupported-operation]
 
   @property
   def principal_point_x(self) -> ArrayLike:
